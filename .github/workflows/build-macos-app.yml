@@ -3,12 +3,13 @@ name: Build macOS app
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -16,12 +17,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify release tag version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          bundle_version="$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)"
+          test "$tag_version" = "$bundle_version"
+
       - name: Build release app bundle
         run: sh scripts/build-app.sh
 
-      - name: Upload unsigned app bundle
+      - name: Archive app bundle
+        run: ditto -c -k --sequesterRsrc --keepParent FritzBoxBandwidth.app FritzBoxBandwidth-macOS.zip
+
+      - name: Upload unsigned app archive
         uses: actions/upload-artifact@v4
         with:
           name: FritzBoxBandwidth-macOS
-          path: FritzBoxBandwidth.app
+          path: FritzBoxBandwidth-macOS.zip
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FritzBoxBandwidth-macOS.zip
+          generate_release_notes: true
