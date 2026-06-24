@@ -527,7 +527,9 @@ final class BandwidthMonitor: ObservableObject {
         samples = storage.load()
         lastUpdated = samples.last?.recordedAt
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.poll() }
+            Task { @MainActor [weak self] in
+                self?.poll()
+            }
         }
         poll()
         prepopulateLineCapacities()
