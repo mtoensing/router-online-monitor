@@ -16,3 +16,4 @@ TR-064 is available on the local network. Reading protected data or changing rou
 - Prefer clear hierarchy, familiar macOS menu-bar and settings patterns, and concise action labels.
 - Windows must adapt to their content: provide adequate content margins and minimum sizes, allow text to wrap where appropriate, and verify that no label, control, or helper text is clipped at the supported window sizes.
 - Keep configuration in a standard `Form` with meaningful sections and only show controls that are relevant to the selected mode.
+- For this menu-bar app, show monitoring controls and configuration in one native transient popover. Do not place editable controls inside a standard `NSMenu`, and do not require a separate Settings window or nested submenu for routine configuration.

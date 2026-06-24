@@ -10,17 +10,14 @@ struct FritzBoxBandwidthMenuBarApp: App {
     @NSApplicationDelegateAdaptor(MenuBarController.self) private var menuBarController
 
     var body: some Scene {
-        Settings {
-            SettingsView(monitor: BandwidthMonitor.shared)
-        }
+        Settings { EmptyView() }
     }
 }
 
 @MainActor
 final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var dashboardWindow: NSWindow?
-    private var settingsWindow: NSWindow?
+    private let popover = NSPopover()
     private var samplesSubscription: AnyCancellable?
     private var preferencesSubscription: AnyCancellable?
     private var sparkline: MenuBarSparklineView?
@@ -35,18 +32,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             button.addSubview(sparkline, positioned: .below, relativeTo: nil)
             self.sparkline = sparkline
         }
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Open bandwidth graph", action: #selector(openDashboard), keyEquivalent: "")
-        menu.addItem(withTitle: "Refresh now", action: #selector(refresh), keyEquivalent: "")
-        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit FritzBox Bandwidth", action: #selector(quit), keyEquivalent: "q")
-        menu.items.forEach { $0.target = self }
-        item.menu = menu
         statusItem = item
 
         Task { @MainActor in
             let monitor = BandwidthMonitor.shared
+            popover.behavior = .transient
+            popover.contentViewController = NSHostingController(rootView: MenuPopoverView(monitor: monitor))
+            item.button?.target = self
+            item.button?.action = #selector(togglePopover)
             samplesSubscription = monitor.$samples.sink { [weak self] _ in self?.updateMenuBar() }
             preferencesSubscription = monitor.$preferencesVersion.sink { [weak self] _ in self?.updateMenuBar() }
             updateMenuBar()
@@ -84,42 +77,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return String(format: "%.0f%%", bitsPerSecond / capacity * 100)
     }
 
-    @objc private func openDashboard() {
-        Task { @MainActor in
-            let monitor = BandwidthMonitor.shared
-            if dashboardWindow == nil {
-                let controller = NSHostingController(rootView: MonitorView(monitor: monitor))
-                let window = NSWindow(contentViewController: controller)
-                window.title = "FritzBox bandwidth"
-                window.styleMask = [.titled, .closable, .miniaturizable]
-                window.setContentSize(NSSize(width: 500, height: 430))
-                window.isReleasedWhenClosed = false
-                dashboardWindow = window
-            }
-            dashboardWindow?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+    @objc private func togglePopover() {
+        guard let button = statusItem?.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
-
-    @objc private func refresh() { Task { @MainActor in BandwidthMonitor.shared.poll() } }
-    @objc private func openSettings() {
-        Task { @MainActor in
-            let monitor = BandwidthMonitor.shared
-            if settingsWindow == nil {
-                let controller = NSHostingController(rootView: SettingsView(monitor: monitor))
-                let window = NSWindow(contentViewController: controller)
-                window.title = "FritzBox bandwidth settings"
-                window.styleMask = [.titled, .closable]
-                window.contentMinSize = NSSize(width: 560, height: 420)
-                window.setContentSize(NSSize(width: 600, height: 460))
-                window.isReleasedWhenClosed = false
-                settingsWindow = window
-            }
-            settingsWindow?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-    }
-    @objc private func quit() { NSApp.terminate(nil) }
 }
 
 final class MenuBarSparklineView: NSView {
@@ -155,6 +120,71 @@ final class MenuBarSparklineView: NSView {
 
         drawLine(recentSamples.map(\.downloadBitsPerSecond), color: .systemBlue)
         drawLine(recentSamples.map(\.uploadBitsPerSecond), color: .systemOrange)
+    }
+}
+
+struct MenuPopoverView: View {
+    @ObservedObject var monitor: BandwidthMonitor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("FritzBox bandwidth").font(.headline)
+                Spacer()
+                Text(monitor.status).font(.caption).foregroundStyle(.secondary)
+            }
+
+            if monitor.samples.isEmpty {
+                VStack(spacing: 6) {
+                    Image(systemName: "chart.xyaxis.line").font(.title2)
+                    Text("Collecting samples").font(.headline)
+                    Text("The first traffic rate appears after two polls.").font(.caption).foregroundStyle(.secondary)
+                }
+                    .frame(height: 130)
+            } else {
+                Chart(monitor.samples) { sample in
+                    LineMark(
+                        x: .value("Time", sample.recordedAt),
+                        y: .value("Mbit/s", sample.downloadBitsPerSecond / 1_000_000),
+                        series: .value("Direction", "Download")
+                    )
+                    .foregroundStyle(.blue)
+                    .interpolationMethod(.linear)
+                    LineMark(
+                        x: .value("Time", sample.recordedAt),
+                        y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
+                        series: .value("Direction", "Upload")
+                    )
+                    .foregroundStyle(.orange)
+                    .interpolationMethod(.linear)
+                }
+                .chartYAxisLabel("Mbit/s")
+                .frame(height: 150)
+            }
+
+            if let latest = monitor.samples.last {
+                HStack(spacing: 16) {
+                    Label(format(latest.downloadBitsPerSecond), systemImage: "arrow.down").foregroundStyle(.blue)
+                    Label(format(latest.uploadBitsPerSecond), systemImage: "arrow.up").foregroundStyle(.orange)
+                }
+                .font(.headline)
+            }
+
+            Divider()
+            SettingsView(monitor: monitor)
+            Divider()
+            HStack {
+                Button("Refresh Now") { monitor.poll() }
+                Spacer()
+                Button("Quit") { NSApp.terminate(nil) }
+            }
+        }
+        .padding()
+        .frame(width: 560)
+    }
+
+    private func format(_ bitsPerSecond: Double) -> String {
+        bitsPerSecond >= 1_000_000 ? String(format: "%.2f Mbit/s", bitsPerSecond / 1_000_000) : String(format: "%.0f kbit/s", bitsPerSecond / 1_000)
     }
 }
 
@@ -289,8 +319,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding()
-        .frame(minWidth: 560, idealWidth: 600)
+        .frame(maxWidth: .infinity)
         .onAppear {
             password = Keychain.password() ?? ""
             detectLineRates()
