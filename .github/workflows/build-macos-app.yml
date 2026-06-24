@@ -1,0 +1,27 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release app bundle
+        run: sh scripts/build-app.sh
+
+      - name: Upload unsigned app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: FritzBoxBandwidth-macOS
+          path: FritzBoxBandwidth.app
+          if-no-files-found: error
