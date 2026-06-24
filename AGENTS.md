@@ -14,6 +14,7 @@ TR-064 is available on the local network. Reading protected data or changing rou
 
 - Push completed changes directly to `main`. Do not create pull requests.
 - Ignore `.DS_Store` files in all status checks, reviews, commits, and other repository work.
+- Every version change pushed to `main` must be published as a GitHub Release with the matching version tag and the GitHub Actions-built app artifact before the work is complete.
 
 ## macOS app design
 
