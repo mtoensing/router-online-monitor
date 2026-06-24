@@ -20,17 +20,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var samplesSubscription: AnyCancellable?
     private var preferencesSubscription: AnyCancellable?
-    private var sparkline: MenuBarSparklineView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.title = "D: —  U: —"
-            button.toolTip = "FritzBox bandwidth: waiting for first sample"
-            let sparkline = MenuBarSparklineView(frame: button.bounds)
-            sparkline.autoresizingMask = [.width, .height]
-            button.addSubview(sparkline, positioned: .below, relativeTo: nil)
-            self.sparkline = sparkline
+            button.toolTip = "FRITZ!Box bandwidth: waiting for first sample"
         }
         statusItem = item
 
@@ -47,34 +42,60 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenuBar() {
-        guard let button = statusItem?.button else { return }
-        let showChart = UserDefaults.standard.object(forKey: "showMenuBarChart") as? Bool ?? true
-        sparkline?.isHidden = !showChart
-        sparkline?.samples = BandwidthMonitor.shared.samples
         guard let sample = BandwidthMonitor.shared.samples.last else {
-            button.title = "D: —  U: —"
-            button.toolTip = "FritzBox bandwidth: waiting for first sample"
+            setMenuBarText(download: "—", upload: "—", downloadNearCapacity: false, uploadNearCapacity: false)
+            statusItem?.button?.toolTip = "FRITZ!Box bandwidth: waiting for first sample"
             return
         }
+        let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
+        let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
         let mode = UserDefaults.standard.string(forKey: "menuBarMode") ?? "rate"
         if mode == "percentage" {
-            let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
-            let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
-            button.title = "D: \(formatPercent(sample.downloadBitsPerSecond, capacity: downCapacity))  U: \(formatPercent(sample.uploadBitsPerSecond, capacity: upCapacity))"
-            button.toolTip = "Current FritzBox bandwidth as a percentage of the configured line speed"
+            setMenuBarText(
+                download: formatPercent(sample.downloadBitsPerSecond, capacity: downCapacity),
+                upload: formatPercent(sample.uploadBitsPerSecond, capacity: upCapacity),
+                downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+                uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            )
+            statusItem?.button?.toolTip = "Current FRITZ!Box bandwidth as a percentage of the configured line speed"
         } else {
-            button.title = "D: \(formatRate(sample.downloadBitsPerSecond))  U: \(formatRate(sample.uploadBitsPerSecond))"
-            button.toolTip = "Current FritzBox download and upload rate"
+            setMenuBarText(
+                download: BandwidthFormatting.compactMbit(sample.downloadBitsPerSecond),
+                upload: BandwidthFormatting.compactMbit(sample.uploadBitsPerSecond),
+                downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+                uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            )
+            statusItem?.button?.toolTip = "Current FRITZ!Box download and upload rate"
         }
     }
 
-    private func formatRate(_ bitsPerSecond: Double) -> String {
-        bitsPerSecond >= 1_000_000 ? String(format: "%.1f Mbit", bitsPerSecond / 1_000_000) : String(format: "%.0f kbit", bitsPerSecond / 1_000)
+    private func setMenuBarText(download: String, upload: String, downloadNearCapacity: Bool, uploadNearCapacity: Bool) {
+        guard let button = statusItem?.button else { return }
+        let downloadText = "D: \(download)"
+        let uploadText = "U: \(upload)"
+        let attributed = NSMutableAttributedString(
+            string: "\(downloadText)  \(uploadText)",
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+        if downloadNearCapacity {
+            attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: 0, length: downloadText.utf16.count))
+        }
+        if uploadNearCapacity {
+            attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: downloadText.utf16.count + 2, length: uploadText.utf16.count))
+        }
+        button.attributedTitle = attributed
     }
 
     private func formatPercent(_ bitsPerSecond: Double, capacity: Double) -> String {
         guard capacity > 0 else { return "—" }
         return String(format: "%.0f%%", bitsPerSecond / capacity * 100)
+    }
+
+    private func isNearCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
+        capacity > 0 && bitsPerSecond >= capacity * 0.95
     }
 
     @objc private func togglePopover() {
@@ -87,39 +108,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 }
 
-final class MenuBarSparklineView: NSView {
-    var samples: [TrafficSample] = [] {
-        didSet { needsDisplay = true }
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let recentSamples = Array(samples.suffix(30))
-        guard recentSamples.count > 1, let context = NSGraphicsContext.current?.cgContext else { return }
-        let maximum = max(
-            max(recentSamples.map(\.downloadBitsPerSecond).max() ?? 0, recentSamples.map(\.uploadBitsPerSecond).max() ?? 0),
-            1
-        )
-        let plot = bounds.insetBy(dx: 3, dy: 4)
-
-        func drawLine(_ values: [Double], color: NSColor) {
-            let path = CGMutablePath()
-            for (index, value) in values.enumerated() {
-                let progress = CGFloat(index) / CGFloat(values.count - 1)
-                let x = plot.minX + plot.width * progress
-                let y = plot.minY + plot.height * CGFloat(value / maximum)
-                index == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
-            }
-            context.setStrokeColor(color.withAlphaComponent(0.2).cgColor)
-            context.setLineWidth(1)
-            context.setLineCap(.round)
-            context.addPath(path)
-            context.strokePath()
-        }
-
-        drawLine(recentSamples.map(\.downloadBitsPerSecond), color: .systemBlue)
-        drawLine(recentSamples.map(\.uploadBitsPerSecond), color: .systemOrange)
+enum BandwidthFormatting {
+    static func compactMbit(_ bitsPerSecond: Double) -> String {
+        let mbitPerSecond = bitsPerSecond / 1_000_000
+        return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(0...1)))) Mbit"
     }
 }
 
@@ -129,7 +121,7 @@ struct MenuPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("FritzBox bandwidth").font(.headline)
+                Text("FRITZ!Box bandwidth").font(.headline)
                 Spacer()
                 Text(monitor.status).font(.caption).foregroundStyle(.secondary)
             }
@@ -150,6 +142,7 @@ struct MenuPopoverView: View {
                     )
                     .foregroundStyle(.blue)
                     .interpolationMethod(.linear)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
                     LineMark(
                         x: .value("Time", sample.recordedAt),
                         y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
@@ -157,6 +150,7 @@ struct MenuPopoverView: View {
                     )
                     .foregroundStyle(.orange)
                     .interpolationMethod(.linear)
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
                 .chartYAxisLabel("Mbit/s")
                 .frame(height: 150)
@@ -164,8 +158,8 @@ struct MenuPopoverView: View {
 
             if let latest = monitor.samples.last {
                 HStack(spacing: 16) {
-                    Label(format(latest.downloadBitsPerSecond), systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label(format(latest.uploadBitsPerSecond), systemImage: "arrow.up").foregroundStyle(.orange)
+                    Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
+                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(.orange)
                 }
                 .font(.headline)
             }
@@ -173,6 +167,9 @@ struct MenuPopoverView: View {
             Divider()
             SettingsView(monitor: monitor)
             Divider()
+            Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             HStack {
                 Button("Refresh Now") { monitor.poll() }
                 Spacer()
@@ -184,7 +181,13 @@ struct MenuPopoverView: View {
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
-        bitsPerSecond >= 1_000_000 ? String(format: "%.2f Mbit/s", bitsPerSecond / 1_000_000) : String(format: "%.0f kbit/s", bitsPerSecond / 1_000)
+        BandwidthFormatting.compactMbit(bitsPerSecond)
+    }
+
+    private func formatWithPercentage(_ bitsPerSecond: Double, capacityKey: String) -> String {
+        let capacity = UserDefaults.standard.double(forKey: capacityKey) * 1_000_000
+        guard capacity > 0 else { return format(bitsPerSecond) }
+        return "\(format(bitsPerSecond)) (\(String(format: "%.0f%%", bitsPerSecond / capacity * 100)))"
     }
 }
 
@@ -194,7 +197,7 @@ struct MonitorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("FritzBox bandwidth").font(.headline)
+                Text("FRITZ!Box bandwidth").font(.headline)
                 Spacer()
                 Text(monitor.status).foregroundStyle(.secondary).font(.caption)
             }
@@ -215,6 +218,7 @@ struct MonitorView: View {
                     )
                         .foregroundStyle(.blue)
                         .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
                     LineMark(
                         x: .value("Time", sample.recordedAt),
                         y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
@@ -222,6 +226,7 @@ struct MonitorView: View {
                     )
                         .foregroundStyle(.orange)
                         .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
                 .chartYAxisLabel("Mbit/s")
                 .chartLegend(position: .bottom, alignment: .leading) {
@@ -232,8 +237,8 @@ struct MonitorView: View {
 
             if let latest = monitor.samples.last {
                 HStack(spacing: 16) {
-                    Label(format(latest.downloadBitsPerSecond), systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label(format(latest.uploadBitsPerSecond), systemImage: "arrow.up").foregroundStyle(.orange)
+                    Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
+                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(.orange)
                 }
                 .font(.headline)
             }
@@ -251,7 +256,13 @@ struct MonitorView: View {
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
-        bitsPerSecond >= 1_000_000 ? String(format: "%.2f Mbit/s", bitsPerSecond / 1_000_000) : String(format: "%.0f kbit/s", bitsPerSecond / 1_000)
+        BandwidthFormatting.compactMbit(bitsPerSecond)
+    }
+
+    private func formatWithPercentage(_ bitsPerSecond: Double, capacityKey: String) -> String {
+        let capacity = UserDefaults.standard.double(forKey: capacityKey) * 1_000_000
+        guard capacity > 0 else { return format(bitsPerSecond) }
+        return "\(format(bitsPerSecond)) (\(String(format: "%.0f%%", bitsPerSecond / capacity * 100)))"
     }
 }
 
@@ -260,7 +271,6 @@ struct SettingsView: View {
     @AppStorage("fritzboxHost") private var host = "192.168.178.1"
     @AppStorage("fritzboxUsername") private var username = ""
     @AppStorage("menuBarMode") private var menuBarMode = "rate"
-    @AppStorage("showMenuBarChart") private var showMenuBarChart = true
     @AppStorage("downstreamCapacityMbit") private var downstreamCapacityMbit = 0.0
     @AppStorage("upstreamCapacityMbit") private var upstreamCapacityMbit = 0.0
     @State private var password = ""
@@ -270,18 +280,17 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("FritzBox connection") {
-                TextField("FritzBox host", text: $host)
+            Section("FRITZ!Box connection") {
+                TextField("FRITZ!Box host", text: $host)
                 TextField("Username", text: $username)
                 SecureField("Password", text: $password)
             }
 
-            Section("Menu bar") {
-                Picker("Display", selection: $menuBarMode) {
+            Section {
+                Picker("Menu-bar display", selection: $menuBarMode) {
                     Text("Bandwidth").tag("rate")
                     Text("Percentage").tag("percentage")
                 }
-                Toggle("Show background chart", isOn: $showMenuBarChart)
 
                 if menuBarMode == "percentage" {
                     TextField("Downstream (Mbit/s)", value: $downstreamCapacityMbit, format: .number)
@@ -293,14 +302,14 @@ struct SettingsView: View {
                         LabeledContent("Detected upstream") {
                             Text("\(format(rates.currentUpstreamMbit)) Mbit/s (max \(format(rates.maximumUpstreamMbit)))")
                         }
-                        Button("Use FritzBox Line Rate") {
+                        Button("Use FRITZ!Box Line Rate") {
                             downstreamCapacityMbit = rates.currentDownstreamMbit
                             upstreamCapacityMbit = rates.currentUpstreamMbit
                         }
                     } else if let detectionError {
                         Text(detectionError).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("Reading the FritzBox line rate…").font(.caption).foregroundStyle(.secondary)
+                        Text("Reading the FRITZ!Box line rate…").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -336,7 +345,7 @@ struct SettingsView: View {
                 if downstreamCapacityMbit <= 0 { downstreamCapacityMbit = rates.currentDownstreamMbit }
                 if upstreamCapacityMbit <= 0 { upstreamCapacityMbit = rates.currentUpstreamMbit }
             } catch {
-                detectionError = "Could not read the FritzBox line rate."
+                detectionError = "Could not read the FRITZ!Box line rate."
             }
         }
     }
@@ -377,12 +386,34 @@ final class BandwidthMonitor: ObservableObject {
             Task { @MainActor in self?.poll() }
         }
         poll()
+        prepopulateLineCapacities()
     }
 
     func reconfigure() {
         previous = nil
         preferencesVersion += 1
         poll()
+        prepopulateLineCapacities()
+    }
+
+    func prepopulateLineCapacities() {
+        let defaults = UserDefaults.standard
+        guard defaults.double(forKey: "downstreamCapacityMbit") <= 0 || defaults.double(forKey: "upstreamCapacityMbit") <= 0,
+              let client = FritzBoxClient.fromPreferences() else { return }
+        Task {
+            do {
+                let rates = try await client.lineRates()
+                if defaults.double(forKey: "downstreamCapacityMbit") <= 0 {
+                    defaults.set(rates.currentDownstreamMbit, forKey: "downstreamCapacityMbit")
+                }
+                if defaults.double(forKey: "upstreamCapacityMbit") <= 0 {
+                    defaults.set(rates.currentUpstreamMbit, forKey: "upstreamCapacityMbit")
+                }
+                preferencesVersion += 1
+            } catch {
+                NSLog("Could not prepopulate DSL line capacities: %@", error.localizedDescription)
+            }
+        }
     }
 
     func poll() {
@@ -411,7 +442,7 @@ final class BandwidthMonitor: ObservableObject {
                 previous = (now, counters.sent, counters.received)
                 status = "Updated \(now.formatted(date: .omitted, time: .shortened))"
             } catch {
-                status = "FritzBox unavailable: \(error.localizedDescription)"
+                status = "FRITZ!Box unavailable: \(error.localizedDescription)"
             }
         }
     }

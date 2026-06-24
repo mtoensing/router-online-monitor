@@ -1,14 +1,14 @@
-# FritzBox workspace notes
+# FRITZ!Box workspace notes
 
 ## Confirmed connectivity
 
-- FritzBox web interface: `http://192.168.178.1/` (HTTP 200 observed).
+- FRITZ!Box web interface: `http://192.168.178.1/` (HTTP 200 observed).
 - TR-064 discovery document: `http://192.168.178.1:49000/tr64desc.xml` (HTTP 200 observed).
 - The HTTPS TR-064 endpoint at `https://192.168.178.1:49443/tr64desc.xml` presents a self-signed certificate.
 
 ## API access
 
-TR-064 is available on the local network. Reading protected data or changing router configuration requires FritzBox credentials; do not store credentials in this repository.
+TR-064 is available on the local network. Reading protected data or changing router configuration requires FRITZ!Box credentials; do not store credentials in this repository.
 
 ## macOS app design
 

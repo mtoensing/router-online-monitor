@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>FritzBox Bandwidth</string>
+    <string>FRITZ!Box Bandwidth</string>
     <key>CFBundleExecutable</key>
     <string>FritzBoxBandwidthMenuBar</string>
     <key>CFBundleIdentifier</key>
     <string>local.fritzbox.bandwidth</string>
     <key>CFBundleName</key>
-    <string>FritzBoxBandwidth</string>
+    <string>FRITZ!Box Bandwidth</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
