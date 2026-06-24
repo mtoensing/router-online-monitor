@@ -4,9 +4,9 @@ A native macOS menu-bar app which connects directly to the FRITZ!Box TR-064 API.
 
 ## Screenshots
 
-![FRITZ!Box bandwidth popover](docs/images/fritz-online-monitor-menu.png)
-
 ![FRITZ!Box bandwidth menu bar](docs/images/fritz-online-monitor-menubar.png)
+
+![FRITZ!Box bandwidth popover](docs/images/fritz-online-monitor-menu.png)
 
 Requirements: macOS 13 or newer and Xcode (or the Xcode Command Line Tools).
 
