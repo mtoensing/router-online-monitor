@@ -10,6 +10,11 @@
 
 TR-064 is available on the local network. Reading protected data or changing router configuration requires FRITZ!Box credentials; do not store credentials in this repository.
 
+## Git workflow
+
+- Push completed changes directly to `main`. Do not create pull requests.
+- Ignore `.DS_Store` files in all status checks, reviews, commits, and other repository work.
+
 ## macOS app design
 
 - Follow Apple’s Human Interface Guidelines for macOS. Use native SwiftUI/AppKit controls, system typography and system colors rather than custom imitations.
