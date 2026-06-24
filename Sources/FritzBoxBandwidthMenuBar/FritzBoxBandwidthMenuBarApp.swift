@@ -273,7 +273,7 @@ struct MenuPopoverView: View {
             HStack {
                 Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
                 Spacer()
-                Text("Version 1.0.1")
+                Text("Version 1.0.2")
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -397,11 +397,23 @@ struct SettingsView: View {
     @State private var saved = false
     @State private var detectedLineRates: DSLLineRates?
     @State private var detectionError: String?
+    @State private var isDiscovering = false
+    @State private var discoveryStatus: String?
 
     var body: some View {
         Form {
             Section {
-                TextField("FRITZ!Box host", text: $host)
+                HStack {
+                    TextField("FRITZ!Box host", text: $host)
+                    Button("Find FRITZ!Box") { discoverFritzBox() }
+                        .disabled(isDiscovering)
+                }
+                if let discoveryStatus {
+                    Text(discoveryStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 TextField("Username", text: $username)
                 SecureField("Password", text: $password)
             } header: {
@@ -422,8 +434,8 @@ struct SettingsView: View {
                     Text("Percentage").tag("percentage")
                 }
                 Picker("Menu-bar labels", selection: $menuBarLabelStyle) {
-                    Text("D: / U: (Default)").tag("short")
-                    Text("↓ / ↑").tag("arrows")
+                    Text("↓ / ↑ (Default)").tag("arrows")
+                    Text("D: / U:").tag("short")
                     Text("Download / Upload").tag("words")
                     Text("Rx / Tx").tag("network")
                     Text("In / Out").tag("direction")
@@ -474,6 +486,9 @@ struct SettingsView: View {
         .onChange(of: showOneDecimalMbit) { _ in
             monitor.refreshPresentation()
         }
+        .onChange(of: menuBarMode) { _ in
+            monitor.refreshPresentation()
+        }
         .onChange(of: menuBarLabelStyle) { _ in
             monitor.refreshPresentation()
         }
@@ -491,6 +506,21 @@ struct SettingsView: View {
             } catch {
                 detectionError = "Could not read the FRITZ!Box line rate."
             }
+        }
+    }
+
+    private func discoverFritzBox() {
+        isDiscovering = true
+        discoveryStatus = "Searching the local network…"
+        Task {
+            do {
+                let discoveredHost = try await FritzBoxDiscovery.host()
+                host = discoveredHost
+                discoveryStatus = "Found FRITZ!Box at \(discoveredHost)."
+            } catch {
+                discoveryStatus = "Could not find a FRITZ!Box on the local network."
+            }
+            isDiscovering = false
         }
     }
 
@@ -743,6 +773,63 @@ enum FritzError: LocalizedError {
         case .requestFailed: return "Request failed"
         case .invalidResponse: return "Unexpected API response"
         }
+    }
+}
+
+enum FritzBoxDiscovery {
+    private static let discoveryPath = "/tr64desc.xml"
+
+    static func host() async throws -> String {
+        let savedHost = UserDefaults.standard.string(forKey: "fritzboxHost")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidates = [savedHost, "192.168.178.1", "192.168.1.1", "192.168.0.1"]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .removingDuplicates()
+
+        let foundHost: String? = await withTaskGroup(of: String?.self) { group -> String? in
+            for candidate in candidates {
+                group.addTask {
+                    do {
+                        try await verify(candidate)
+                        return candidate
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            for await result in group {
+                if let result {
+                    group.cancelAll()
+                    return result
+                }
+            }
+            return nil
+        }
+        guard let foundHost else { throw FritzError.requestFailed }
+        return foundHost
+    }
+
+    private static func verify(_ host: String) async throws {
+        guard let url = URL(string: "http://\(host):49000\(discoveryPath)") else {
+            throw FritzError.invalidHost
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 2
+        configuration.timeoutIntervalForResource = 3
+        let (data, response) = try await URLSession(configuration: configuration).data(from: url)
+        guard let http = response as? HTTPURLResponse,
+              http.statusCode == 200,
+              let description = String(data: data, encoding: .utf8),
+              description.localizedCaseInsensitiveContains("AVM") || description.localizedCaseInsensitiveContains("FRITZ") else {
+            throw FritzError.invalidResponse
+        }
+    }
+}
+
+private extension Array where Element: Hashable {
+    func removingDuplicates() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }
 
