@@ -20,6 +20,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var samplesSubscription: AnyCancellable?
     private var preferencesSubscription: AnyCancellable?
+    private var connectionSubscription: AnyCancellable?
+    private var connectingSubscription: AnyCancellable?
+    private var connectingAnimationTimer: Timer?
+    private var connectingAnimationStep = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -37,23 +41,40 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             item.button?.action = #selector(togglePopover)
             samplesSubscription = monitor.$samples.sink { [weak self] _ in self?.updateMenuBar() }
             preferencesSubscription = monitor.$preferencesVersion.sink { [weak self] _ in self?.updateMenuBar() }
+            connectionSubscription = monitor.$isConnected.sink { [weak self] _ in self?.updateMenuBar() }
+            connectingSubscription = monitor.$isConnecting.sink { [weak self] _ in self?.updateMenuBar() }
             updateMenuBar()
         }
     }
 
     private func updateMenuBar() {
-        guard let sample = BandwidthMonitor.shared.samples.last else {
-            setMenuBarText(download: "—", upload: "—", downloadNearCapacity: false, uploadNearCapacity: false)
+        let monitor = BandwidthMonitor.shared
+        guard monitor.isConnected else {
+            if monitor.isConnecting {
+                startConnectingAnimation()
+            } else {
+                stopConnectingAnimation()
+                setMenuBarTitle("Disconnected")
+            }
+            statusItem?.button?.toolTip = monitor.status
+            return
+        }
+        stopConnectingAnimation()
+        guard let sample = monitor.samples.last else {
+            setMenuBarTitle("Connecting…")
             statusItem?.button?.toolTip = "FRITZ!Box bandwidth: waiting for first sample"
             return
         }
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
+        let labels = menuBarLabels()
         let mode = UserDefaults.standard.string(forKey: "menuBarMode") ?? "rate"
         if mode == "percentage" {
             setMenuBarText(
                 download: formatPercent(sample.downloadBitsPerSecond, capacity: downCapacity),
                 upload: formatPercent(sample.uploadBitsPerSecond, capacity: upCapacity),
+                downloadLabel: labels.download,
+                uploadLabel: labels.upload,
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
@@ -62,6 +83,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             setMenuBarText(
                 download: BandwidthFormatting.compactMbit(sample.downloadBitsPerSecond),
                 upload: BandwidthFormatting.compactMbit(sample.uploadBitsPerSecond),
+                downloadLabel: labels.download,
+                uploadLabel: labels.upload,
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
@@ -69,10 +92,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setMenuBarText(download: String, upload: String, downloadNearCapacity: Bool, uploadNearCapacity: Bool) {
+    private func setMenuBarText(download: String, upload: String, downloadLabel: String, uploadLabel: String, downloadNearCapacity: Bool, uploadNearCapacity: Bool) {
         guard let button = statusItem?.button else { return }
-        let downloadText = "D: \(download)"
-        let uploadText = "U: \(upload)"
+        let downloadText = "\(downloadLabel) \(download)"
+        let uploadText = "\(uploadLabel) \(upload)"
         let attributed = NSMutableAttributedString(
             string: "\(downloadText)  \(uploadText)",
             attributes: [
@@ -87,6 +110,49 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: downloadText.utf16.count + 2, length: uploadText.utf16.count))
         }
         button.attributedTitle = attributed
+    }
+
+    private func menuBarLabels() -> (download: String, upload: String) {
+        switch UserDefaults.standard.string(forKey: "menuBarLabelStyle") ?? "arrows" {
+        case "arrows": return ("↓", "↑")
+        case "words": return ("↓ Download", "↑ Upload")
+        case "network": return ("Rx", "Tx")
+        case "direction": return ("In", "Out")
+        default: return ("D:", "U:")
+        }
+    }
+
+    private func setMenuBarTitle(_ title: String) {
+        guard let button = statusItem?.button else { return }
+        button.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+    }
+
+    private func startConnectingAnimation() {
+        guard connectingAnimationTimer == nil else { return }
+        updateConnectingTitle()
+        connectingAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.connectingAnimationStep = (self.connectingAnimationStep + 1) % 4
+                self.updateConnectingTitle()
+            }
+        }
+    }
+
+    private func stopConnectingAnimation() {
+        connectingAnimationTimer?.invalidate()
+        connectingAnimationTimer = nil
+        connectingAnimationStep = 0
+    }
+
+    private func updateConnectingTitle() {
+        setMenuBarTitle("Connecting" + String(repeating: ".", count: connectingAnimationStep))
     }
 
     private func formatPercent(_ bitsPerSecond: Double, capacity: Double) -> String {
@@ -111,7 +177,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 enum BandwidthFormatting {
     static func compactMbit(_ bitsPerSecond: Double) -> String {
         let mbitPerSecond = bitsPerSecond / 1_000_000
-        return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(0...1)))) Mbit"
+        if UserDefaults.standard.bool(forKey: "showOneDecimalMbit") {
+            if mbitPerSecond > 0 && mbitPerSecond < 0.05 {
+                return "<0.1 Mbit"
+            }
+            return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(1)))) Mbit"
+        }
+        if mbitPerSecond > 0 && mbitPerSecond < 0.5 {
+            return "<1 Mbit"
+        }
+        return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(0)))) Mbit"
     }
 }
 
@@ -123,7 +198,19 @@ struct MenuPopoverView: View {
             HStack {
                 Text("FRITZ!Box bandwidth").font(.headline)
                 Spacer()
-                Text(monitor.status).font(.caption).foregroundStyle(.secondary)
+                if monitor.isRefreshing {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Polling…")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text(lastUpdatedLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if monitor.samples.isEmpty {
@@ -148,7 +235,7 @@ struct MenuPopoverView: View {
                         y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
                         series: .value("Direction", "Upload")
                     )
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color(nsColor: .systemPink))
                     .interpolationMethod(.linear)
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
@@ -159,7 +246,7 @@ struct MenuPopoverView: View {
             if let latest = monitor.samples.last {
                 HStack(spacing: 16) {
                     Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(.orange)
+                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
                 }
                 .font(.headline)
             }
@@ -167,11 +254,16 @@ struct MenuPopoverView: View {
             Divider()
             SettingsView(monitor: monitor)
             Divider()
-            Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            HStack {
+                Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
+                Spacer()
+                Text("Version 1.0")
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
             HStack {
                 Button("Refresh Now") { monitor.poll() }
+                    .disabled(monitor.isRefreshing)
                 Spacer()
                 Button("Quit") { NSApp.terminate(nil) }
             }
@@ -188,6 +280,11 @@ struct MenuPopoverView: View {
         let capacity = UserDefaults.standard.double(forKey: capacityKey) * 1_000_000
         guard capacity > 0 else { return format(bitsPerSecond) }
         return "\(format(bitsPerSecond)) (\(String(format: "%.0f%%", bitsPerSecond / capacity * 100)))"
+    }
+
+    private var lastUpdatedLabel: String {
+        guard let lastUpdated = monitor.lastUpdated else { return "No data yet" }
+        return "Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
     }
 }
 
@@ -224,13 +321,13 @@ struct MonitorView: View {
                         y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
                         series: .value("Direction", "Upload")
                     )
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color(nsColor: .systemPink))
                         .interpolationMethod(.linear)
                         .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
                 .chartYAxisLabel("Mbit/s")
                 .chartLegend(position: .bottom, alignment: .leading) {
-                    HStack { Label("Download", systemImage: "circle.fill").foregroundStyle(.blue); Label("Upload", systemImage: "circle.fill").foregroundStyle(.orange) }
+                    HStack { Label("Download", systemImage: "circle.fill").foregroundStyle(.blue); Label("Upload", systemImage: "circle.fill").foregroundStyle(Color(nsColor: .systemPink)) }
                 }
                 .frame(width: 460, height: 260)
             }
@@ -238,7 +335,7 @@ struct MonitorView: View {
             if let latest = monitor.samples.last {
                 HStack(spacing: 16) {
                     Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(.orange)
+                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
                 }
                 .font(.headline)
             }
@@ -271,6 +368,8 @@ struct SettingsView: View {
     @AppStorage("fritzboxHost") private var host = "192.168.178.1"
     @AppStorage("fritzboxUsername") private var username = ""
     @AppStorage("menuBarMode") private var menuBarMode = "rate"
+    @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
+    @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
     @AppStorage("downstreamCapacityMbit") private var downstreamCapacityMbit = 0.0
     @AppStorage("upstreamCapacityMbit") private var upstreamCapacityMbit = 0.0
     @State private var password = ""
@@ -280,10 +379,20 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("FRITZ!Box connection") {
+            Section {
                 TextField("FRITZ!Box host", text: $host)
                 TextField("Username", text: $username)
                 SecureField("Password", text: $password)
+            } header: {
+                HStack(spacing: 5) {
+                    Text("FRITZ!Box connection")
+                    Circle()
+                        .fill(connectionColor)
+                        .frame(width: 8, height: 8)
+                        .accessibilityLabel(connectionAccessibilityLabel)
+                    Text("(\(connectionStatusLabel))")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -291,26 +400,34 @@ struct SettingsView: View {
                     Text("Bandwidth").tag("rate")
                     Text("Percentage").tag("percentage")
                 }
+                Picker("Menu-bar labels", selection: $menuBarLabelStyle) {
+                    Text("D: / U: (Default)").tag("short")
+                    Text("↓ / ↑").tag("arrows")
+                    Text("Download / Upload").tag("words")
+                    Text("Rx / Tx").tag("network")
+                    Text("In / Out").tag("direction")
+                }
+                Toggle("Show one decimal place", isOn: $showOneDecimalMbit)
+            }
 
-                if menuBarMode == "percentage" {
-                    TextField("Downstream (Mbit/s)", value: $downstreamCapacityMbit, format: .number)
-                    TextField("Upstream (Mbit/s)", value: $upstreamCapacityMbit, format: .number)
-                    if let rates = detectedLineRates {
-                        LabeledContent("Detected downstream") {
-                            Text("\(format(rates.currentDownstreamMbit)) Mbit/s (max \(format(rates.maximumDownstreamMbit)))")
-                        }
-                        LabeledContent("Detected upstream") {
-                            Text("\(format(rates.currentUpstreamMbit)) Mbit/s (max \(format(rates.maximumUpstreamMbit)))")
-                        }
-                        Button("Use FRITZ!Box Line Rate") {
-                            downstreamCapacityMbit = rates.currentDownstreamMbit
-                            upstreamCapacityMbit = rates.currentUpstreamMbit
-                        }
-                    } else if let detectionError {
-                        Text(detectionError).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text("Reading the FRITZ!Box line rate…").font(.caption).foregroundStyle(.secondary)
+            Section("Capacity limits") {
+                TextField("Downstream (Mbit/s)", value: $downstreamCapacityMbit, format: .number)
+                TextField("Upstream (Mbit/s)", value: $upstreamCapacityMbit, format: .number)
+                if let rates = detectedLineRates {
+                    LabeledContent("Detected downstream") {
+                        Text("\(format(rates.currentDownstreamMbit)) Mbit/s (max \(format(rates.maximumDownstreamMbit)))")
                     }
+                    LabeledContent("Detected upstream") {
+                        Text("\(format(rates.currentUpstreamMbit)) Mbit/s (max \(format(rates.maximumUpstreamMbit)))")
+                    }
+                    Button("Use FRITZ!Box Line Rate") {
+                        downstreamCapacityMbit = rates.currentDownstreamMbit
+                        upstreamCapacityMbit = rates.currentUpstreamMbit
+                    }
+                } else if let detectionError {
+                    Text(detectionError).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Reading the FRITZ!Box line rate…").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -333,6 +450,12 @@ struct SettingsView: View {
             password = Keychain.password() ?? ""
             detectLineRates()
         }
+        .onChange(of: showOneDecimalMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: menuBarLabelStyle) { _ in
+            monitor.refreshPresentation()
+        }
     }
 
     private func detectLineRates() {
@@ -352,6 +475,20 @@ struct SettingsView: View {
 
     private func format(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+
+    private var connectionColor: Color {
+        if monitor.isConnected { return Color(nsColor: .systemGreen) }
+        if monitor.isConnecting { return Color(nsColor: .systemOrange) }
+        return Color(nsColor: .systemRed)
+    }
+
+    private var connectionAccessibilityLabel: String {
+        monitor.isConnected ? "Connected" : monitor.isConnecting ? "Connecting" : "Disconnected"
+    }
+
+    private var connectionStatusLabel: String {
+        connectionAccessibilityLabel
     }
 }
 
@@ -373,15 +510,22 @@ struct DSLLineRates {
 final class BandwidthMonitor: ObservableObject {
     static let shared = BandwidthMonitor()
     @Published private(set) var samples: [TrafficSample] = []
-    @Published private(set) var status = "Configure credentials in Settings"
+    @Published private(set) var status = "Enter FRITZ!Box credentials below"
     @Published private(set) var preferencesVersion = 0
+    @Published private(set) var isConnected = false
+    @Published private(set) var isConnecting = false
+    @Published private(set) var isRefreshing = false
+    @Published private(set) var lastUpdated: Date?
 
     private let storage = SampleStorage()
     private var previous: (date: Date, sent: UInt64, received: UInt64)?
     private var timer: Timer?
+    private var pollInFlight = false
+    private var consecutivePollFailures = 0
 
     init() {
         samples = storage.load()
+        lastUpdated = samples.last?.recordedAt
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
@@ -394,6 +538,10 @@ final class BandwidthMonitor: ObservableObject {
         preferencesVersion += 1
         poll()
         prepopulateLineCapacities()
+    }
+
+    func refreshPresentation() {
+        preferencesVersion += 1
     }
 
     func prepopulateLineCapacities() {
@@ -417,12 +565,23 @@ final class BandwidthMonitor: ObservableObject {
     }
 
     func poll() {
+        guard !pollInFlight else { return }
         guard let client = FritzBoxClient.fromPreferences() else {
-            status = "Configure credentials in Settings"
+            status = "Enter FRITZ!Box credentials below"
+            isConnecting = false
+            isConnected = false
+            isRefreshing = false
             return
         }
+        pollInFlight = true
+        isRefreshing = true
+        if !isConnected { isConnecting = true }
         status = "Refreshing…"
         Task {
+            defer {
+                pollInFlight = false
+                isRefreshing = false
+            }
             do {
                 let counters = try await client.counters()
                 let now = Date()
@@ -440,9 +599,25 @@ final class BandwidthMonitor: ObservableObject {
                     }
                 }
                 previous = (now, counters.sent, counters.received)
+                consecutivePollFailures = 0
+                isConnected = true
+                isConnecting = false
+                lastUpdated = now
                 status = "Updated \(now.formatted(date: .omitted, time: .shortened))"
             } catch {
-                status = "FRITZ!Box unavailable: \(error.localizedDescription)"
+                consecutivePollFailures += 1
+                if consecutivePollFailures >= 3 {
+                    isConnecting = false
+                    isConnected = false
+                    status = "FRITZ!Box unavailable: \(error.localizedDescription)"
+                } else {
+                    isConnecting = true
+                    status = "Retrying FRITZ!Box connection…"
+                    Task { @MainActor [weak self] in
+                        try? await Task.sleep(for: .seconds(2))
+                        self?.poll()
+                    }
+                }
             }
         }
     }

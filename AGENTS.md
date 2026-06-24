@@ -17,3 +17,4 @@ TR-064 is available on the local network. Reading protected data or changing rou
 - Windows must adapt to their content: provide adequate content margins and minimum sizes, allow text to wrap where appropriate, and verify that no label, control, or helper text is clipped at the supported window sizes.
 - Keep configuration in a standard `Form` with meaningful sections and only show controls that are relevant to the selected mode.
 - For this menu-bar app, show monitoring controls and configuration in one native transient popover. Do not place editable controls inside a standard `NSMenu`, and do not require a separate Settings window or nested submenu for routine configuration.
+- For charts, use high-contrast semantic system colors and redundant encoding such as solid versus dashed lines. Do not rely on color alone; reserve system red for the near-capacity warning.
