@@ -1,5 +1,9 @@
 # FRITZ!Box Bandwidth Menu Bar
 
+<p align="center">
+  <img src="docs/images/fritzbox-bandwidth-logo.svg" alt="FRITZ!Box Bandwidth logo" width="160">
+</p>
+
 A native macOS menu-bar app which connects directly to the FRITZ!Box TR-064 API. It samples total WAN download and upload traffic, shows a graph for the retained history, and stores credentials in the macOS Keychain.
 
 ## Screenshots

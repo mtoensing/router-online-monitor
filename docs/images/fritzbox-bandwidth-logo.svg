@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">FRITZ!Box Bandwidth</title>
+  <desc id="description">A blue router with network activity bars and a white lightning bolt.</desc>
+  <defs>
+    <linearGradient id="background" x1="72" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="router" x1="112" y1="280" x2="400" y2="402" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E0F2FE"/>
+      <stop offset="1" stop-color="#BAE6FD"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="128" y1="138" x2="386" y2="255" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#background)"/>
+  <circle cx="256" cy="256" r="204" fill="none" stroke="#93C5FD" stroke-opacity=".18" stroke-width="2"/>
+  <circle cx="256" cy="256" r="164" fill="none" stroke="#93C5FD" stroke-opacity=".12" stroke-width="2"/>
+
+  <g fill="none" stroke="url(#signal)" stroke-linecap="round">
+    <path d="M178 240c0-43 35-78 78-78s78 35 78 78" stroke-width="18"/>
+    <path d="M145 239c0-61 50-111 111-111s111 50 111 111" stroke-width="18" opacity=".65"/>
+  </g>
+
+  <path d="M112 298c0-18 14-32 32-32h224c18 0 32 14 32 32v82c0 18-14 32-32 32H144c-18 0-32-14-32-32v-82Z" fill="url(#router)"/>
+  <path d="M112 331h288" stroke="#0C4A6E" stroke-opacity=".18" stroke-width="3"/>
+  <circle cx="161" cy="356" r="10" fill="#16A34A"/>
+  <circle cx="195" cy="356" r="10" fill="#0EA5E9"/>
+  <path d="M301 356h51M301 380h29" stroke="#0C4A6E" stroke-linecap="round" stroke-width="12"/>
+
+  <g transform="translate(201 192)">
+    <circle cx="55" cy="55" r="66" fill="#1D4ED8" stroke="#DBEAFE" stroke-width="8"/>
+    <!-- Bolt glyph based on Heroicons Solid, MIT License. -->
+    <path d="M61.5 1.25 12.75 61.25h37.5l-3.75 37.5 48.75-60H57.75l3.75-37.5Z" fill="#FFF"/>
+  </g>
+</svg>
