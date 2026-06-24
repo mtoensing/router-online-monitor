@@ -170,7 +170,23 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            Task { @MainActor [weak self, weak button] in
+                guard let self, let button else { return }
+                self.constrainPopover(to: button)
+            }
         }
+    }
+
+    private func constrainPopover(to button: NSStatusBarButton) {
+        guard let window = popover.contentViewController?.view.window,
+              let screen = button.window?.screen ?? NSScreen.main else { return }
+        let visibleFrame = screen.visibleFrame
+        let margin: CGFloat = 8
+        var frame = window.frame
+        let minimumX = visibleFrame.minX + margin
+        let maximumX = max(minimumX, visibleFrame.maxX - frame.width - margin)
+        frame.origin.x = min(max(frame.origin.x, minimumX), maximumX)
+        window.setFrame(frame, display: true)
     }
 }
 
@@ -213,15 +229,15 @@ struct MenuPopoverView: View {
                 }
             }
 
-            if monitor.samples.isEmpty {
+            if recentSamples.isEmpty {
                 VStack(spacing: 6) {
                     Image(systemName: "chart.xyaxis.line").font(.title2)
                     Text("Collecting samples").font(.headline)
-                    Text("The first traffic rate appears after two polls.").font(.caption).foregroundStyle(.secondary)
+                    Text("No samples from the last 30 minutes.").font(.caption).foregroundStyle(.secondary)
                 }
                     .frame(height: 130)
             } else {
-                Chart(monitor.samples) { sample in
+                Chart(recentSamples) { sample in
                     LineMark(
                         x: .value("Time", sample.recordedAt),
                         y: .value("Mbit/s", sample.downloadBitsPerSecond / 1_000_000),
@@ -257,7 +273,7 @@ struct MenuPopoverView: View {
             HStack {
                 Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
                 Spacer()
-                Text("Version 1.0")
+                Text("Version 1.0.1")
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -285,6 +301,11 @@ struct MenuPopoverView: View {
     private var lastUpdatedLabel: String {
         guard let lastUpdated = monitor.lastUpdated else { return "No data yet" }
         return "Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private var recentSamples: [TrafficSample] {
+        let cutoff = Date().addingTimeInterval(-30 * 60)
+        return monitor.samples.filter { $0.recordedAt >= cutoff }
     }
 }
 
