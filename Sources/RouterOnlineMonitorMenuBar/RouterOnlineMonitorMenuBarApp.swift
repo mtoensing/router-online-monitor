@@ -552,7 +552,7 @@ final class TrafficMonitor: ObservableObject {
     init() {
         samples = storage.load()
         lastUpdated = samples.last?.recordedAt
-        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.poll()
             }
