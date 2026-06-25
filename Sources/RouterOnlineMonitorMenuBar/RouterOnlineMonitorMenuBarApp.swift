@@ -6,11 +6,16 @@ import Security
 import SwiftUI
 
 @main
-struct RouterOnlineMonitorMenuBarApp: App {
-    @NSApplicationDelegateAdaptor(MenuBarController.self) private var menuBarController
+enum RouterOnlineMonitorMenuBarApp {
+    @MainActor private static var menuBarController: MenuBarController?
 
-    var body: some Scene {
-        Settings { EmptyView() }
+    @MainActor static func main() {
+        let app = NSApplication.shared
+        let controller = MenuBarController()
+        menuBarController = controller
+        app.delegate = controller
+        app.setActivationPolicy(.accessory)
+        app.run()
     }
 }
 
@@ -26,9 +31,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var connectingAnimationStep = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            button.title = "D: —  U: —"
+            button.image = Self.menuBarArrowsImage()
+            button.imagePosition = .imageOnly
             button.toolTip = "Router Online Monitor: waiting for first sample"
         }
         statusItem = item
@@ -50,18 +56,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func updateMenuBar() {
         let monitor = TrafficMonitor.shared
         guard monitor.isConnected else {
-            if monitor.isConnecting {
-                startConnectingAnimation()
-            } else {
-                stopConnectingAnimation()
-                setMenuBarTitle("Disconnected")
-            }
+            stopConnectingAnimation()
+            setMenuBarIcon()
             statusItem?.button?.toolTip = monitor.status
             return
         }
         stopConnectingAnimation()
         guard let sample = monitor.samples.last else {
-            setMenuBarTitle("Connecting…")
+            setMenuBarIcon()
             statusItem?.button?.toolTip = "Router Online Monitor: waiting for first sample"
             return
         }
@@ -94,6 +96,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func setMenuBarText(download: String, upload: String, downloadLabel: String, uploadLabel: String, downloadNearCapacity: Bool, uploadNearCapacity: Bool) {
         guard let button = statusItem?.button else { return }
+        statusItem?.length = NSStatusItem.variableLength
+        button.image = nil
+        button.imagePosition = .noImage
         let downloadText = "\(downloadLabel) \(download)"
         let uploadText = "\(uploadLabel) \(upload)"
         let attributed = NSMutableAttributedString(
@@ -112,6 +117,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.attributedTitle = attributed
     }
 
+    private func setMenuBarIcon() {
+        guard let button = statusItem?.button else { return }
+        statusItem?.length = NSStatusItem.squareLength
+        button.title = ""
+        button.attributedTitle = NSAttributedString()
+        button.image = Self.menuBarArrowsImage()
+        button.imagePosition = .imageOnly
+    }
+
     private func menuBarLabels() -> (download: String, upload: String) {
         switch UserDefaults.standard.string(forKey: "menuBarLabelStyle") ?? "arrows" {
         case "arrows": return ("↓", "↑")
@@ -124,6 +138,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func setMenuBarTitle(_ title: String) {
         guard let button = statusItem?.button else { return }
+        statusItem?.length = NSStatusItem.variableLength
+        button.image = nil
+        button.imagePosition = .noImage
         button.attributedTitle = NSAttributedString(
             string: title,
             attributes: [
@@ -131,6 +148,39 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 .foregroundColor: NSColor.labelColor,
             ]
         )
+    }
+
+    private static func menuBarArrowsImage() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.black.setStroke()
+            let strokeWidth: CGFloat = 2.2
+
+            let down = NSBezierPath()
+            down.lineWidth = strokeWidth
+            down.lineCapStyle = .round
+            down.lineJoinStyle = .round
+            down.move(to: NSPoint(x: 6, y: 14.5))
+            down.line(to: NSPoint(x: 6, y: 3.5))
+            down.move(to: NSPoint(x: 2.5, y: 7))
+            down.line(to: NSPoint(x: 6, y: 3.5))
+            down.line(to: NSPoint(x: 9.5, y: 7))
+            down.stroke()
+
+            let up = NSBezierPath()
+            up.lineWidth = strokeWidth
+            up.lineCapStyle = .round
+            up.lineJoinStyle = .round
+            up.move(to: NSPoint(x: 12, y: 3.5))
+            up.line(to: NSPoint(x: 12, y: 14.5))
+            up.move(to: NSPoint(x: 8.5, y: 11))
+            up.line(to: NSPoint(x: 12, y: 14.5))
+            up.line(to: NSPoint(x: 15.5, y: 11))
+            up.stroke()
+
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     private func startConnectingAnimation() {
