@@ -42,4 +42,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: Router-Online-Monitor-macOS.zip
+          body: |
+            ## macOS Gatekeeper note
+
+            This open-source release is ad-hoc signed but not Apple-notarized. macOS may block the first launch with “Apple could not verify this app is free of malware.”
+
+            If you trust this build, move the app to `/Applications` and run:
+
+            ```sh
+            xattr -dr com.apple.quarantine "/Applications/Router Online Monitor.app"
+            ```
           generate_release_notes: true
+          append_body: true

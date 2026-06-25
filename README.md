@@ -18,17 +18,17 @@ Requirements: macOS 13 or newer and Xcode (or the Xcode Command Line Tools).
 
 Download the latest `Router-Online-Monitor-macOS.zip` from the GitHub releases page and move `Router Online Monitor.app` to `/Applications`.
 
-Release builds must be signed with an Apple Developer ID certificate and notarized by Apple. Older unnotarized downloads may be blocked by Gatekeeper with “Apple could not verify this app is free of malware”; use the newest notarized release.
+Router Online Monitor is open source and currently released without Apple notarization. The app bundle is ad-hoc signed, but macOS may still block the first launch with “Apple could not verify this app is free of malware.”
 
-## Maintainer release signing
+If you trust the downloaded release, remove the quarantine attribute after moving the app to `/Applications`:
 
-The `Release new version` GitHub Actions workflow requires these repository secrets before it will create a version tag or release:
+```sh
+xattr -dr com.apple.quarantine "/Applications/Router Online Monitor.app"
+```
 
-- `MACOS_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12` certificate.
-- `MACOS_CERTIFICATE_PASSWORD`: password for the `.p12` certificate.
-- `APPLE_ID`: Apple ID email used for notarization.
-- `APPLE_TEAM_ID`: Apple Developer Team ID.
-- `APPLE_APP_SPECIFIC_PASSWORD`: app-specific password for notarization.
+Then start the app again.
+
+Fully warning-free distribution would require an Apple Developer ID certificate and Apple notarization.
 
 ## Compatible FRITZ!Box models
 
