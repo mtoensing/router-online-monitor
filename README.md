@@ -18,7 +18,17 @@ Requirements: macOS 13 or newer and Xcode (or the Xcode Command Line Tools).
 
 Download the latest `Router-Online-Monitor-macOS.zip` from the GitHub releases page and move `Router Online Monitor.app` to `/Applications`.
 
-The release app is ad-hoc signed but not Apple-notarized. On first launch, macOS may still require Control-clicking the app and choosing Open. Full click-to-open distribution requires signing and notarizing with an Apple Developer ID certificate.
+Release builds must be signed with an Apple Developer ID certificate and notarized by Apple. Older unnotarized downloads may be blocked by Gatekeeper with “Apple could not verify this app is free of malware”; use the newest notarized release.
+
+## Maintainer release signing
+
+The `Release new version` GitHub Actions workflow requires these repository secrets before it will create a version tag or release:
+
+- `MACOS_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12` certificate.
+- `MACOS_CERTIFICATE_PASSWORD`: password for the `.p12` certificate.
+- `APPLE_ID`: Apple ID email used for notarization.
+- `APPLE_TEAM_ID`: Apple Developer Team ID.
+- `APPLE_APP_SPECIFIC_PASSWORD`: app-specific password for notarization.
 
 ## Compatible FRITZ!Box models
 

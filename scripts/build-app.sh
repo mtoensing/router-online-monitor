@@ -12,6 +12,11 @@ mkdir -p "$app/Contents/Resources"
 cp .build/release/RouterOnlineMonitorMenuBar "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
 cp Resources/AppIcon.icns "$app/Contents/Resources/"
-codesign --force --deep --sign - "$app"
+signing_identity="${SIGNING_IDENTITY:--}"
+if [ "$signing_identity" = "-" ]; then
+    codesign --force --deep --sign - "$app"
+else
+    codesign --force --deep --options runtime --timestamp --sign "$signing_identity" "$app"
+fi
 codesign --verify --deep --strict --verbose=2 "$app"
 echo "Built $app"
