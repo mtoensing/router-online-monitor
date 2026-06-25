@@ -8,6 +8,8 @@ if [ -e "$app" ]; then
     exit 1
 fi
 mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/Resources"
 cp .build/release/RouterOnlineMonitorMenuBar "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/"
+cp Resources/AppIcon.icns "$app/Contents/Resources/"
 echo "Built $app"

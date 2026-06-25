@@ -8,6 +8,8 @@
     <string>RouterOnlineMonitorMenuBar</string>
     <key>CFBundleIdentifier</key>
     <string>local.router-online-monitor</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleName</key>
     <string>Router Online Monitor</string>
     <key>CFBundlePackageType</key>
