@@ -5,6 +5,16 @@ import Foundation
 import Security
 import SwiftUI
 
+enum L10n {
+    static func string(_ key: String) -> String {
+        NSLocalizedString(key, bundle: .module, comment: "")
+    }
+
+    static func format(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: string(key), locale: .current, arguments: arguments)
+    }
+}
+
 @main
 enum RouterOnlineMonitorMenuBarApp {
     @MainActor private static var menuBarController: MenuBarController?
@@ -35,7 +45,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         if let button = item.button {
             button.image = Self.menuBarArrowsImage()
             button.imagePosition = .imageOnly
-            button.toolTip = "Router Online Monitor: waiting for first sample"
+            button.toolTip = L10n.string("menubar.tooltip.waitingForFirstSample")
         }
         statusItem = item
 
@@ -81,7 +91,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
-            statusItem?.button?.toolTip = "Current router traffic as a percentage of the configured line speed"
+            statusItem?.button?.toolTip = L10n.string("menubar.tooltip.percentage")
         } else {
             setMenuBarText(
                 download: TrafficFormatting.compactMbit(sample.downloadBitsPerSecond),
@@ -91,7 +101,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
-            statusItem?.button?.toolTip = "Current router download and upload rate"
+            statusItem?.button?.toolTip = L10n.string("menubar.tooltip.rate")
         }
     }
 
@@ -130,9 +140,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func menuBarLabels() -> (download: String, upload: String) {
         switch UserDefaults.standard.string(forKey: "menuBarLabelStyle") ?? "arrows" {
         case "arrows": return ("↓", "↑")
-        case "words": return ("↓ Download", "↑ Upload")
+        case "words": return ("↓ \(L10n.string("traffic.download"))", "↑ \(L10n.string("traffic.upload"))")
         case "network": return ("Rx", "Tx")
-        case "direction": return ("In", "Out")
+        case "direction": return (L10n.string("traffic.in"), L10n.string("traffic.out"))
         default: return ("D:", "U:")
         }
     }
@@ -203,7 +213,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func updateConnectingTitle() {
-        setMenuBarTitle("Connecting" + String(repeating: ".", count: connectingAnimationStep))
+        setMenuBarTitle(L10n.string("status.connecting") + String(repeating: ".", count: connectingAnimationStep))
     }
 
     private func formatPercent(_ bitsPerSecond: Double, capacity: Double) -> String {
@@ -246,14 +256,14 @@ enum TrafficFormatting {
         let mbitPerSecond = bitsPerSecond / 1_000_000
         if UserDefaults.standard.bool(forKey: "showOneDecimalMbit") {
             if mbitPerSecond > 0 && mbitPerSecond < 0.05 {
-                return "<0.1 Mbit"
+                return L10n.string("traffic.lessThanPointOneMbit")
             }
-            return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(1)))) Mbit"
+            return L10n.format("traffic.mbit", mbitPerSecond.formatted(.number.precision(.fractionLength(1))))
         }
         if mbitPerSecond > 0 && mbitPerSecond < 0.5 {
-            return "<1 Mbit"
+            return L10n.string("traffic.lessThanOneMbit")
         }
-        return "\(mbitPerSecond.formatted(.number.precision(.fractionLength(0)))) Mbit"
+        return L10n.format("traffic.mbit", mbitPerSecond.formatted(.number.precision(.fractionLength(0))))
     }
 }
 
@@ -266,7 +276,7 @@ struct MenuPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Router Online Monitor").font(.headline)
+                Text(L10n.string("app.name")).font(.headline)
                 Spacer()
                 if monitor.isRefreshing {
                     ProgressView()
@@ -292,17 +302,17 @@ struct MenuPopoverView: View {
             } else {
                 Chart(recentSamples) { sample in
                     LineMark(
-                        x: .value("Time", sample.recordedAt),
+                        x: .value(L10n.string("chart.axis.time"), sample.recordedAt),
                         y: .value("Mbit/s", sample.downloadBitsPerSecond / 1_000_000),
-                        series: .value("Direction", "Download")
+                        series: .value(L10n.string("chart.series.direction"), L10n.string("traffic.download"))
                     )
                     .foregroundStyle(.blue)
                     .interpolationMethod(.linear)
                     .lineStyle(StrokeStyle(lineWidth: 2))
                     LineMark(
-                        x: .value("Time", sample.recordedAt),
+                        x: .value(L10n.string("chart.axis.time"), sample.recordedAt),
                         y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
-                        series: .value("Direction", "Upload")
+                        series: .value(L10n.string("chart.series.direction"), L10n.string("traffic.upload"))
                     )
                     .foregroundStyle(Color(nsColor: .systemPink))
                     .interpolationMethod(.linear)
@@ -315,8 +325,8 @@ struct MenuPopoverView: View {
             if let latestSample = monitor.samples.last {
                 let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
                 HStack(spacing: 16) {
-                    Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
+                    Label(L10n.format("traffic.downloadWithValue", formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit")), systemImage: "arrow.down").foregroundStyle(.blue)
+                    Label(L10n.format("traffic.uploadWithValue", formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit")), systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
                 }
                 .font(.headline)
             }
@@ -325,9 +335,9 @@ struct MenuPopoverView: View {
             SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
             Divider()
             HStack {
-                Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
+                Text(L10n.string("disclaimer.short"))
                 Spacer()
-                Text("Version 1.0.13")
+                Text(L10n.format("app.version", "1.0.13"))
                     .onTapGesture {
                         registerVersionClick()
                     }
@@ -335,10 +345,10 @@ struct MenuPopoverView: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
             HStack {
-                Button("Refresh Now") { monitor.poll() }
+                Button(L10n.string("button.refreshNow")) { monitor.poll() }
                     .disabled(monitor.isRefreshing)
                 Spacer()
-                Button("Quit") { NSApp.terminate(nil) }
+                Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
             }
         }
         .padding()
@@ -356,33 +366,37 @@ struct MenuPopoverView: View {
     }
 
     private var headerStatusLabel: String {
-        if monitor.isRefreshing { return "Polling…" }
+        if monitor.isRefreshing { return L10n.string("status.polling") }
         guard let lastUpdated = monitor.lastUpdated else { return monitor.status }
-        return "Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+        return L10n.format("status.lastUpdated", lastUpdated.formatted(date: .omitted, time: .shortened))
     }
 
     private var emptyStateTitle: String {
-        if monitor.status == "Enter router credentials below" { return "Setup required" }
-        if monitor.isRefreshing { return "Polling router" }
-        if monitor.lastUpdated != nil { return "Waiting for second sample" }
-        return "Waiting for router"
+        if isSetupRequired { return L10n.string("empty.setupRequired.title") }
+        if monitor.isRefreshing { return L10n.string("empty.pollingRouter.title") }
+        if monitor.lastUpdated != nil { return L10n.string("empty.waitingForSecondSample.title") }
+        return L10n.string("empty.waitingForRouter.title")
     }
 
     private var emptyStateMessage: String {
-        if monitor.status == "Enter router credentials below" {
-            return "Enter router credentials below, then save and connect."
+        if isSetupRequired {
+            return L10n.string("empty.setupRequired.message")
         }
         if monitor.isRefreshing {
-            return "Reading traffic counters from the router…"
+            return L10n.string("empty.pollingRouter.message")
         }
         if monitor.lastUpdated != nil {
-            return "Connected. The first traffic rate appears after the next poll."
+            return L10n.string("empty.waitingForSecondSample.message")
         }
         return monitor.status
     }
 
     private var emptyStateSystemImage: String {
-        monitor.status == "Enter router credentials below" ? "gearshape" : "chart.xyaxis.line"
+        isSetupRequired ? "gearshape" : "chart.xyaxis.line"
+    }
+
+    private var isSetupRequired: Bool {
+        monitor.status == L10n.string("status.enterCredentials")
     }
 
     private var recentSamples: [TrafficSample] {
@@ -430,8 +444,8 @@ struct SettingsView: View {
         Form {
             Section {
                 HStack {
-                    TextField("Router host", text: $host)
-                    Button("Find Router") { discoverRouter() }
+                    TextField(L10n.string("field.routerHost"), text: $host)
+                    Button(L10n.string("button.findRouter")) { discoverRouter() }
                         .disabled(isDiscovering)
                 }
                 if let discoveryStatus {
@@ -440,11 +454,11 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                TextField("Username", text: $username)
-                SecureField("Password", text: $password)
+                TextField(L10n.string("field.username"), text: $username)
+                SecureField(L10n.string("field.password"), text: $password)
             } header: {
                 HStack(spacing: 5) {
-                    Text("Router connection")
+                    Text(L10n.string("section.routerConnection"))
                     Circle()
                         .fill(connectionColor)
                         .frame(width: 8, height: 8)
@@ -455,45 +469,45 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker("Menu-bar display", selection: $menuBarMode) {
-                    Text("Traffic rate").tag("rate")
-                    Text("Percentage").tag("percentage")
+                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarMode) {
+                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
+                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
                 }
-                Picker("Menu-bar labels", selection: $menuBarLabelStyle) {
-                    Text("↓ / ↑ (Default)").tag("arrows")
-                    Text("D: / U:").tag("short")
-                    Text("Download / Upload").tag("words")
-                    Text("Rx / Tx").tag("network")
-                    Text("In / Out").tag("direction")
+                Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
+                    Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
+                    Text(L10n.string("picker.menuBarLabels.short")).tag("short")
+                    Text(L10n.string("picker.menuBarLabels.words")).tag("words")
+                    Text(L10n.string("picker.menuBarLabels.network")).tag("network")
+                    Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
                 }
-                Toggle("Show one decimal place", isOn: $showOneDecimalMbit)
+                Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
             }
 
-            Section("Capacity limits") {
-                TextField("Downstream (Mbit/s)", value: $downstreamCapacityMbit, format: .number)
-                TextField("Upstream (Mbit/s)", value: $upstreamCapacityMbit, format: .number)
+            Section(L10n.string("section.capacityLimits")) {
+                TextField(L10n.string("field.downstreamCapacity"), value: $downstreamCapacityMbit, format: .number)
+                TextField(L10n.string("field.upstreamCapacity"), value: $upstreamCapacityMbit, format: .number)
                 if let rates = detectedLineRates {
-                    LabeledContent("Detected downstream") {
-                        Text("\(format(rates.currentDownstreamMbit)) Mbit/s (max \(format(rates.maximumDownstreamMbit)))")
+                    LabeledContent(L10n.string("lineRate.detectedDownstream")) {
+                        Text(L10n.format("lineRate.currentAndMax", format(rates.currentDownstreamMbit), format(rates.maximumDownstreamMbit)))
                     }
-                    LabeledContent("Detected upstream") {
-                        Text("\(format(rates.currentUpstreamMbit)) Mbit/s (max \(format(rates.maximumUpstreamMbit)))")
+                    LabeledContent(L10n.string("lineRate.detectedUpstream")) {
+                        Text(L10n.format("lineRate.currentAndMax", format(rates.currentUpstreamMbit), format(rates.maximumUpstreamMbit)))
                     }
-                    Button("Use Router Line Rate") {
+                    Button(L10n.string("button.useRouterLineRate")) {
                         downstreamCapacityMbit = rates.currentDownstreamMbit
                         upstreamCapacityMbit = rates.currentUpstreamMbit
                     }
                 } else if let detectionError {
                     Text(detectionError).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text("Reading the router line rate…").font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.string("lineRate.reading")).font(.caption).foregroundStyle(.secondary)
                 }
             }
 
             if showsHiddenSettings {
-                Section("Hidden settings") {
-                    TextField("Polling interval (seconds)", value: $pollIntervalSeconds, format: .number)
-                    Text("Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.")
+                Section(L10n.string("section.hiddenSettings")) {
+                    TextField(L10n.string("field.pollingInterval"), value: $pollIntervalSeconds, format: .number)
+                    Text(L10n.string("help.pollingInterval"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -503,14 +517,14 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Spacer()
-                    Button("Save and Connect") {
-                    Keychain.save(password: password)
-                    saved = true
-                    monitor.reconfigure()
-                    detectLineRates()
+                    Button(L10n.string("button.saveAndConnect")) {
+                        Keychain.save(password: password)
+                        saved = true
+                        monitor.reconfigure()
+                        detectLineRates()
                     }
                     .keyboardShortcut(.defaultAction)
-                    if saved { Text("Saved to Keychain").foregroundStyle(.secondary) }
+                    if saved { Text(L10n.string("status.savedToKeychain")).foregroundStyle(.secondary) }
                 }
             }
         }
@@ -544,21 +558,21 @@ struct SettingsView: View {
                 if downstreamCapacityMbit <= 0 { downstreamCapacityMbit = rates.currentDownstreamMbit }
                 if upstreamCapacityMbit <= 0 { upstreamCapacityMbit = rates.currentUpstreamMbit }
             } catch {
-                detectionError = "Could not read the router line rate."
+                detectionError = L10n.string("lineRate.error")
             }
         }
     }
 
     private func discoverRouter() {
         isDiscovering = true
-        discoveryStatus = "Searching the local network…"
+        discoveryStatus = L10n.string("routerDiscovery.searching")
         Task {
             do {
                 let discoveredHost = try await RouterDiscovery.host()
                 host = discoveredHost
-                discoveryStatus = "Found router at \(discoveredHost)."
+                discoveryStatus = L10n.format("routerDiscovery.found", discoveredHost)
             } catch {
-                discoveryStatus = "Could not find a compatible router on the local network."
+                discoveryStatus = L10n.string("routerDiscovery.notFound")
             }
             isDiscovering = false
         }
@@ -581,7 +595,7 @@ struct SettingsView: View {
     }
 
     private var connectionAccessibilityLabel: String {
-        monitor.isConnected ? "Connected" : monitor.isConnecting ? "Connecting" : "Disconnected"
+        monitor.isConnected ? L10n.string("connection.connected") : monitor.isConnecting ? L10n.string("connection.connecting") : L10n.string("connection.disconnected")
     }
 
     private var connectionStatusLabel: String {
@@ -628,7 +642,7 @@ final class TrafficMonitor: ObservableObject {
     static let shared = TrafficMonitor()
     private static let maximumStoredSamples = 10_000
     @Published private(set) var samples: [TrafficSample] = []
-    @Published private(set) var status = "Enter router credentials below"
+    @Published private(set) var status = L10n.string("status.enterCredentials")
     @Published private(set) var preferencesVersion = 0
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
@@ -687,7 +701,7 @@ final class TrafficMonitor: ObservableObject {
     func poll() {
         guard !pollInFlight else { return }
         guard let client = RouterClient.fromPreferences() else {
-            status = "Enter router credentials below"
+            status = L10n.string("status.enterCredentials")
             isConnecting = false
             isConnected = false
             isRefreshing = false
@@ -696,7 +710,7 @@ final class TrafficMonitor: ObservableObject {
         pollInFlight = true
         isRefreshing = true
         if !isConnected { isConnecting = true }
-        status = "Refreshing…"
+        status = L10n.string("status.refreshing")
         Task {
             defer {
                 pollInFlight = false
@@ -719,7 +733,7 @@ final class TrafficMonitor: ObservableObject {
                         storage.save(samples)
                     }
                 } else {
-                    status = "Connected. Waiting for second sample…"
+                    status = L10n.string("status.connectedWaitingForSecondSample")
                 }
                 previous = (now, counters.sent, counters.received)
                 consecutivePollFailures = 0
@@ -727,17 +741,17 @@ final class TrafficMonitor: ObservableObject {
                 isConnecting = false
                 lastUpdated = now
                 if !samples.isEmpty {
-                    status = "Updated \(now.formatted(date: .omitted, time: .shortened))"
+                    status = L10n.format("status.updated", now.formatted(date: .omitted, time: .shortened))
                 }
             } catch {
                 consecutivePollFailures += 1
                 if consecutivePollFailures >= 3 {
                     isConnecting = false
                     isConnected = false
-                    status = "Router unavailable: \(error.localizedDescription)"
+                    status = L10n.format("status.routerUnavailable", error.localizedDescription)
                 } else {
                     isConnecting = true
-                    status = "Retrying router connection…"
+                    status = L10n.string("status.retryingRouterConnection")
                     Task { @MainActor [weak self] in
                         try? await Task.sleep(for: .seconds(2))
                         self?.poll()
@@ -862,9 +876,9 @@ enum RouterAPIError: LocalizedError {
     case invalidHost, requestFailed, invalidResponse
     var errorDescription: String? {
         switch self {
-        case .invalidHost: return "Invalid host"
-        case .requestFailed: return "Request failed"
-        case .invalidResponse: return "Unexpected API response"
+        case .invalidHost: return L10n.string("error.invalidHost")
+        case .requestFailed: return L10n.string("error.requestFailed")
+        case .invalidResponse: return L10n.string("error.invalidResponse")
         }
     }
 }
