@@ -6,7 +6,7 @@ import Security
 import SwiftUI
 
 @main
-struct FritzBoxBandwidthMenuBarApp: App {
+struct RouterOnlineMonitorMenuBarApp: App {
     @NSApplicationDelegateAdaptor(MenuBarController.self) private var menuBarController
 
     var body: some Scene {
@@ -29,12 +29,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.title = "D: —  U: —"
-            button.toolTip = "FRITZ!Box bandwidth: waiting for first sample"
+            button.toolTip = "Router Online Monitor: waiting for first sample"
         }
         statusItem = item
 
         Task { @MainActor in
-            let monitor = BandwidthMonitor.shared
+            let monitor = TrafficMonitor.shared
             popover.behavior = .transient
             popover.contentViewController = NSHostingController(rootView: MenuPopoverView(monitor: monitor))
             item.button?.target = self
@@ -48,7 +48,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenuBar() {
-        let monitor = BandwidthMonitor.shared
+        let monitor = TrafficMonitor.shared
         guard monitor.isConnected else {
             if monitor.isConnecting {
                 startConnectingAnimation()
@@ -62,7 +62,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         stopConnectingAnimation()
         guard let sample = monitor.samples.last else {
             setMenuBarTitle("Connecting…")
-            statusItem?.button?.toolTip = "FRITZ!Box bandwidth: waiting for first sample"
+            statusItem?.button?.toolTip = "Router Online Monitor: waiting for first sample"
             return
         }
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
@@ -78,17 +78,17 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
-            statusItem?.button?.toolTip = "Current FRITZ!Box bandwidth as a percentage of the configured line speed"
+            statusItem?.button?.toolTip = "Current router traffic as a percentage of the configured line speed"
         } else {
             setMenuBarText(
-                download: BandwidthFormatting.compactMbit(sample.downloadBitsPerSecond),
-                upload: BandwidthFormatting.compactMbit(sample.uploadBitsPerSecond),
+                download: TrafficFormatting.compactMbit(sample.downloadBitsPerSecond),
+                upload: TrafficFormatting.compactMbit(sample.uploadBitsPerSecond),
                 downloadLabel: labels.download,
                 uploadLabel: labels.upload,
                 downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
                 uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
-            statusItem?.button?.toolTip = "Current FRITZ!Box download and upload rate"
+            statusItem?.button?.toolTip = "Current router download and upload rate"
         }
     }
 
@@ -190,7 +190,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 }
 
-enum BandwidthFormatting {
+enum TrafficFormatting {
     static func compactMbit(_ bitsPerSecond: Double) -> String {
         let mbitPerSecond = bitsPerSecond / 1_000_000
         if UserDefaults.standard.bool(forKey: "showOneDecimalMbit") {
@@ -207,12 +207,12 @@ enum BandwidthFormatting {
 }
 
 struct MenuPopoverView: View {
-    @ObservedObject var monitor: BandwidthMonitor
+    @ObservedObject var monitor: TrafficMonitor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("FRITZ!Box bandwidth").font(.headline)
+                Text("Router Online Monitor").font(.headline)
                 Spacer()
                 if monitor.isRefreshing {
                     HStack(spacing: 4) {
@@ -289,7 +289,7 @@ struct MenuPopoverView: View {
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
-        BandwidthFormatting.compactMbit(bitsPerSecond)
+        TrafficFormatting.compactMbit(bitsPerSecond)
     }
 
     private func formatWithPercentage(_ bitsPerSecond: Double, capacityKey: String) -> String {
@@ -310,12 +310,12 @@ struct MenuPopoverView: View {
 }
 
 struct MonitorView: View {
-    @ObservedObject var monitor: BandwidthMonitor
+    @ObservedObject var monitor: TrafficMonitor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("FRITZ!Box bandwidth").font(.headline)
+                Text("Router Online Monitor").font(.headline)
                 Spacer()
                 Text(monitor.status).foregroundStyle(.secondary).font(.caption)
             }
@@ -374,7 +374,7 @@ struct MonitorView: View {
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
-        BandwidthFormatting.compactMbit(bitsPerSecond)
+        TrafficFormatting.compactMbit(bitsPerSecond)
     }
 
     private func formatWithPercentage(_ bitsPerSecond: Double, capacityKey: String) -> String {
@@ -385,9 +385,9 @@ struct MonitorView: View {
 }
 
 struct SettingsView: View {
-    @ObservedObject var monitor: BandwidthMonitor
-    @AppStorage("fritzboxHost") private var host = "192.168.178.1"
-    @AppStorage("fritzboxUsername") private var username = ""
+    @ObservedObject var monitor: TrafficMonitor
+    @AppStorage("routerHost") private var host = "192.168.178.1"
+    @AppStorage("routerUsername") private var username = ""
     @AppStorage("menuBarMode") private var menuBarMode = "rate"
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
@@ -404,8 +404,8 @@ struct SettingsView: View {
         Form {
             Section {
                 HStack {
-                    TextField("FRITZ!Box host", text: $host)
-                    Button("Find FRITZ!Box") { discoverFritzBox() }
+                    TextField("Router host", text: $host)
+                    Button("Find Router") { discoverRouter() }
                         .disabled(isDiscovering)
                 }
                 if let discoveryStatus {
@@ -418,7 +418,7 @@ struct SettingsView: View {
                 SecureField("Password", text: $password)
             } header: {
                 HStack(spacing: 5) {
-                    Text("FRITZ!Box connection")
+                    Text("Router connection")
                     Circle()
                         .fill(connectionColor)
                         .frame(width: 8, height: 8)
@@ -430,7 +430,7 @@ struct SettingsView: View {
 
             Section {
                 Picker("Menu-bar display", selection: $menuBarMode) {
-                    Text("Bandwidth").tag("rate")
+                    Text("Traffic rate").tag("rate")
                     Text("Percentage").tag("percentage")
                 }
                 Picker("Menu-bar labels", selection: $menuBarLabelStyle) {
@@ -453,14 +453,14 @@ struct SettingsView: View {
                     LabeledContent("Detected upstream") {
                         Text("\(format(rates.currentUpstreamMbit)) Mbit/s (max \(format(rates.maximumUpstreamMbit)))")
                     }
-                    Button("Use FRITZ!Box Line Rate") {
+                    Button("Use Router Line Rate") {
                         downstreamCapacityMbit = rates.currentDownstreamMbit
                         upstreamCapacityMbit = rates.currentUpstreamMbit
                     }
                 } else if let detectionError {
                     Text(detectionError).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text("Reading the FRITZ!Box line rate…").font(.caption).foregroundStyle(.secondary)
+                    Text("Reading the router line rate…").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -495,7 +495,7 @@ struct SettingsView: View {
     }
 
     private func detectLineRates() {
-        guard let client = FritzBoxClient.fromPreferences() else { return }
+        guard let client = RouterClient.fromPreferences() else { return }
         Task {
             do {
                 let rates = try await client.lineRates()
@@ -504,21 +504,21 @@ struct SettingsView: View {
                 if downstreamCapacityMbit <= 0 { downstreamCapacityMbit = rates.currentDownstreamMbit }
                 if upstreamCapacityMbit <= 0 { upstreamCapacityMbit = rates.currentUpstreamMbit }
             } catch {
-                detectionError = "Could not read the FRITZ!Box line rate."
+                detectionError = "Could not read the router line rate."
             }
         }
     }
 
-    private func discoverFritzBox() {
+    private func discoverRouter() {
         isDiscovering = true
         discoveryStatus = "Searching the local network…"
         Task {
             do {
-                let discoveredHost = try await FritzBoxDiscovery.host()
+                let discoveredHost = try await RouterDiscovery.host()
                 host = discoveredHost
-                discoveryStatus = "Found FRITZ!Box at \(discoveredHost)."
+                discoveryStatus = "Found router at \(discoveredHost)."
             } catch {
-                discoveryStatus = "Could not find a FRITZ!Box on the local network."
+                discoveryStatus = "Could not find a compatible router on the local network."
             }
             isDiscovering = false
         }
@@ -558,10 +558,10 @@ struct DSLLineRates {
 }
 
 @MainActor
-final class BandwidthMonitor: ObservableObject {
-    static let shared = BandwidthMonitor()
+final class TrafficMonitor: ObservableObject {
+    static let shared = TrafficMonitor()
     @Published private(set) var samples: [TrafficSample] = []
-    @Published private(set) var status = "Enter FRITZ!Box credentials below"
+    @Published private(set) var status = "Enter router credentials below"
     @Published private(set) var preferencesVersion = 0
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
@@ -600,7 +600,7 @@ final class BandwidthMonitor: ObservableObject {
     func prepopulateLineCapacities() {
         let defaults = UserDefaults.standard
         guard defaults.double(forKey: "downstreamCapacityMbit") <= 0 || defaults.double(forKey: "upstreamCapacityMbit") <= 0,
-              let client = FritzBoxClient.fromPreferences() else { return }
+              let client = RouterClient.fromPreferences() else { return }
         Task {
             do {
                 let rates = try await client.lineRates()
@@ -619,8 +619,8 @@ final class BandwidthMonitor: ObservableObject {
 
     func poll() {
         guard !pollInFlight else { return }
-        guard let client = FritzBoxClient.fromPreferences() else {
-            status = "Enter FRITZ!Box credentials below"
+        guard let client = RouterClient.fromPreferences() else {
+            status = "Enter router credentials below"
             isConnecting = false
             isConnected = false
             isRefreshing = false
@@ -662,10 +662,10 @@ final class BandwidthMonitor: ObservableObject {
                 if consecutivePollFailures >= 3 {
                     isConnecting = false
                     isConnected = false
-                    status = "FRITZ!Box unavailable: \(error.localizedDescription)"
+                    status = "Router unavailable: \(error.localizedDescription)"
                 } else {
                     isConnecting = true
-                    status = "Retrying FRITZ!Box connection…"
+                    status = "Retrying router connection…"
                     Task { @MainActor [weak self] in
                         try? await Task.sleep(for: .seconds(2))
                         self?.poll()
@@ -680,18 +680,18 @@ final class BandwidthMonitor: ObservableObject {
     }
 }
 
-struct FritzBoxClient {
+struct RouterClient {
     let host: String
     let username: String
     let password: String
     private static let service = "urn:dslforum-org:service:WANCommonInterfaceConfig:1"
     private static let dslService = "urn:dslforum-org:service:WANDSLInterfaceConfig:1"
 
-    static func fromPreferences() -> FritzBoxClient? {
-        let host = UserDefaults.standard.string(forKey: "fritzboxHost")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let username = UserDefaults.standard.string(forKey: "fritzboxUsername")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    static func fromPreferences() -> RouterClient? {
+        let host = UserDefaults.standard.string(forKey: "routerHost")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let username = UserDefaults.standard.string(forKey: "routerUsername")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !host.isEmpty, !username.isEmpty, let password = Keychain.password(), !password.isEmpty else { return nil }
-        return FritzBoxClient(host: host, username: username, password: password)
+        return RouterClient(host: host, username: username, password: password)
     }
 
     func counters() async throws -> (sent: UInt64, received: UInt64) {
@@ -701,7 +701,7 @@ struct FritzBoxClient {
     }
 
     func lineRates() async throws -> DSLLineRates {
-        guard let url = URL(string: "http://\(host):49000/upnp/control/wandslifconfig1") else { throw FritzError.invalidHost }
+        guard let url = URL(string: "http://\(host):49000/upnp/control/wandslifconfig1") else { throw RouterAPIError.invalidHost }
         let xml = """
         <?xml version=\"1.0\" encoding=\"utf-8\"?>
         <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:GetInfo xmlns:u=\"\(Self.dslService)\"/></s:Body></s:Envelope>
@@ -714,10 +714,10 @@ struct FritzBoxClient {
         let delegate = DigestDelegate(username: username, password: password)
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw FritzError.requestFailed }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw RouterAPIError.requestFailed }
         let root = try XMLDocument(data: data, options: [])
         func rate(_ field: String) throws -> Double {
-            guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let kbitPerSecond = Double(text) else { throw FritzError.invalidResponse }
+            guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let kbitPerSecond = Double(text) else { throw RouterAPIError.invalidResponse }
             return kbitPerSecond / 1_000
         }
         return try DSLLineRates(
@@ -729,7 +729,7 @@ struct FritzBoxClient {
     }
 
     private func counter(action: String, field: String) async throws -> UInt64 {
-        guard let url = URL(string: "http://\(host):49000/upnp/control/wancommonifconfig1") else { throw FritzError.invalidHost }
+        guard let url = URL(string: "http://\(host):49000/upnp/control/wancommonifconfig1") else { throw RouterAPIError.invalidHost }
         let xml = """
         <?xml version=\"1.0\" encoding=\"utf-8\"?>
         <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:\(action) xmlns:u=\"\(Self.service)\"/></s:Body></s:Envelope>
@@ -742,9 +742,9 @@ struct FritzBoxClient {
         let delegate = DigestDelegate(username: username, password: password)
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw FritzError.requestFailed }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw RouterAPIError.requestFailed }
         let root = try XMLDocument(data: data, options: [])
-        guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let value = UInt64(text) else { throw FritzError.invalidResponse }
+        guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let value = UInt64(text) else { throw RouterAPIError.invalidResponse }
         return value
     }
 }
@@ -765,7 +765,7 @@ final class DigestDelegate: NSObject, URLSessionTaskDelegate {
     }
 }
 
-enum FritzError: LocalizedError {
+enum RouterAPIError: LocalizedError {
     case invalidHost, requestFailed, invalidResponse
     var errorDescription: String? {
         switch self {
@@ -776,11 +776,11 @@ enum FritzError: LocalizedError {
     }
 }
 
-enum FritzBoxDiscovery {
+enum RouterDiscovery {
     private static let discoveryPath = "/tr64desc.xml"
 
     static func host() async throws -> String {
-        let savedHost = UserDefaults.standard.string(forKey: "fritzboxHost")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedHost = UserDefaults.standard.string(forKey: "routerHost")?.trimmingCharacters(in: .whitespacesAndNewlines)
         let candidates = [savedHost, "192.168.178.1", "192.168.1.1", "192.168.0.1"]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
@@ -805,13 +805,13 @@ enum FritzBoxDiscovery {
             }
             return nil
         }
-        guard let foundHost else { throw FritzError.requestFailed }
+        guard let foundHost else { throw RouterAPIError.requestFailed }
         return foundHost
     }
 
     private static func verify(_ host: String) async throws {
         guard let url = URL(string: "http://\(host):49000\(discoveryPath)") else {
-            throw FritzError.invalidHost
+            throw RouterAPIError.invalidHost
         }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 2
@@ -821,7 +821,7 @@ enum FritzBoxDiscovery {
               http.statusCode == 200,
               let description = String(data: data, encoding: .utf8),
               description.localizedCaseInsensitiveContains("AVM") || description.localizedCaseInsensitiveContains("FRITZ") else {
-            throw FritzError.invalidResponse
+            throw RouterAPIError.invalidResponse
         }
     }
 }
@@ -837,7 +837,7 @@ final class SampleStorage {
     private let url: URL
 
     init() {
-        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("FritzBoxBandwidth", isDirectory: true)
+        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("RouterOnlineMonitor", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         url = folder.appendingPathComponent("samples.json")
     }
@@ -854,8 +854,8 @@ final class SampleStorage {
 }
 
 enum Keychain {
-    private static let service = "FritzBoxBandwidth"
-    private static let account = "fritzbox-password"
+    private static let service = "RouterOnlineMonitor"
+    private static let account = "router-password"
 
     static func password() -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecReturnData as String: true]

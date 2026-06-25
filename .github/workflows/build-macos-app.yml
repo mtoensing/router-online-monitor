@@ -28,18 +28,18 @@ jobs:
         run: sh scripts/build-app.sh
 
       - name: Archive app bundle
-        run: ditto -c -k --sequesterRsrc --keepParent FritzBoxBandwidth.app FritzBoxBandwidth-macOS.zip
+        run: ditto -c -k --sequesterRsrc --keepParent "Router Online Monitor.app" Router-Online-Monitor-macOS.zip
 
       - name: Upload unsigned app archive
         uses: actions/upload-artifact@v4
         with:
-          name: FritzBoxBandwidth-macOS
-          path: FritzBoxBandwidth-macOS.zip
+          name: Router-Online-Monitor-macOS
+          path: Router-Online-Monitor-macOS.zip
           if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: FritzBoxBandwidth-macOS.zip
+          files: Router-Online-Monitor-macOS.zip
           generate_release_notes: true

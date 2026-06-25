@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
-  <title id="title">FRITZ!Box Bandwidth</title>
+  <title id="title">Router Online Monitor</title>
   <desc id="description">A blue router with network activity bars and a white lightning bolt.</desc>
   <defs>
     <linearGradient id="background" x1="72" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">

@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>FRITZ!Box Bandwidth</string>
+    <string>Router Online Monitor</string>
     <key>CFBundleExecutable</key>
-    <string>FritzBoxBandwidthMenuBar</string>
+    <string>RouterOnlineMonitorMenuBar</string>
     <key>CFBundleIdentifier</key>
-    <string>local.fritzbox.bandwidth</string>
+    <string>local.router-online-monitor</string>
     <key>CFBundleName</key>
-    <string>FRITZ!Box Bandwidth</string>
+    <string>Router Online Monitor</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

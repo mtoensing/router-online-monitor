@@ -52,7 +52,7 @@ jobs:
           from pathlib import Path
 
           info_path = Path("Resources/Info.plist")
-          app_path = Path("Sources/FritzBoxBandwidthMenuBar/FritzBoxBandwidthMenuBarApp.swift")
+          app_path = Path("Sources/RouterOnlineMonitorMenuBar/RouterOnlineMonitorMenuBarApp.swift")
 
           info = info_path.read_text()
           app = app_path.read_text()
@@ -154,12 +154,33 @@ jobs:
       - name: Commit version bump
         run: |
           git status --short
-          git add Resources/Info.plist Sources/FritzBoxBandwidthMenuBar/FritzBoxBandwidthMenuBarApp.swift
-          git commit -m "Release FRITZ!Box Bandwidth ${{ steps.version.outputs.version }}"
+          git add Resources/Info.plist Sources/RouterOnlineMonitorMenuBar/RouterOnlineMonitorMenuBarApp.swift
+          git commit -m "Release Router Online Monitor ${{ steps.version.outputs.version }}"
 
       - name: Create and push release tag
         run: |
           tag="${{ steps.version.outputs.tag }}"
-          git tag -a "$tag" -m "FRITZ!Box Bandwidth ${{ steps.version.outputs.version }}"
+          git tag -a "$tag" -m "Router Online Monitor ${{ steps.version.outputs.version }}"
           git push origin HEAD:main
           git push origin "$tag"
+
+      - name: Build release app bundle
+        run: sh scripts/build-app.sh
+
+      - name: Archive app bundle
+        run: ditto -c -k --sequesterRsrc --keepParent "Router Online Monitor.app" Router-Online-Monitor-macOS.zip
+
+      - name: Upload unsigned app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Router-Online-Monitor-macOS
+          path: Router-Online-Monitor-macOS.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: main
+          files: Router-Online-Monitor-macOS.zip
+          generate_release_notes: true

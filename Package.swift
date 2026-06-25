@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "FritzBoxBandwidth",
+    name: "RouterOnlineMonitor",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "FritzBoxBandwidthMenuBar", targets: ["FritzBoxBandwidthMenuBar"])
+        .executable(name: "RouterOnlineMonitorMenuBar", targets: ["RouterOnlineMonitorMenuBar"])
     ],
     targets: [
-        .executableTarget(name: "FritzBoxBandwidthMenuBar")
+        .executableTarget(name: "RouterOnlineMonitorMenuBar")
     ]
 )

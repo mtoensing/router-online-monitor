@@ -1,4 +1,4 @@
-# FRITZ!Box workspace notes
+# Router Online Monitor workspace notes
 
 ## Confirmed connectivity
 
@@ -15,7 +15,7 @@ TR-064 is available on the local network. Reading protected data or changing rou
 - Push completed changes directly to `main`. Do not create pull requests.
 - Ignore `.DS_Store` files in all status checks, reviews, commits, and other repository work.
 - Always create new app versions through the `Release new version` GitHub Actions workflow. Do not manually edit release version files, create release commits, create version tags, or publish GitHub Releases unless repairing a failed workflow run.
-- For releasable work, first push the completed non-version changes to `main`, then trigger the release-version action. The action must increment the semantic version, increment `CFBundleVersion`, update the visible in-app version label, commit directly to `main`, and create the matching `v*` tag.
+- For releasable work, first push the completed non-version changes to `main`, then trigger the release-version action. The action must increment the semantic version, increment `CFBundleVersion`, update the visible in-app version label, commit directly to `main`, create the matching `v*` tag, build the app artifact, and publish the GitHub Release.
 - Every version tag must produce a GitHub Release with the matching tag and the GitHub Actions-built app artifact before the work is complete.
 
 ## macOS app design
