@@ -1,7 +1,7 @@
 # Router Online Monitor
 
 <p align="center">
-  <img src="docs/images/router-online-monitor-logo.svg" alt="Router Online Monitor logo" width="160">
+  <img src="docs/images/router-online-monitor-logo.svg" alt="Router Online Monitor app icon: white lightning bolt on a red background" width="180">
 </p>
 
 A native macOS menu-bar app for monitoring router Internet traffic. It connects directly to compatible FRITZ!Box routers through the TR-064 API, samples total WAN download and upload traffic, shows a graph for the retained history, and stores credentials in the macOS Keychain.
