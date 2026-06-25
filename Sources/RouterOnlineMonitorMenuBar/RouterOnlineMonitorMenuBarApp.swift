@@ -7,11 +7,24 @@ import SwiftUI
 
 enum L10n {
     static func string(_ key: String) -> String {
-        NSLocalizedString(key, bundle: .module, comment: "")
+        NSLocalizedString(key, bundle: bundle, comment: "")
     }
 
     static func format(_ key: String, _ arguments: CVarArg...) -> String {
         String(format: string(key), locale: .current, arguments: arguments)
+    }
+
+    private static let bundleName = "RouterOnlineMonitor_RouterOnlineMonitorMenuBar.bundle"
+
+    private static var bundle: Bundle {
+        if let resourceURL = Bundle.main.resourceURL?.appendingPathComponent(bundleName),
+           let bundle = Bundle(url: resourceURL) {
+            return bundle
+        }
+        if let bundle = Bundle(path: Bundle.main.bundleURL.appendingPathComponent(bundleName).path) {
+            return bundle
+        }
+        return .module
     }
 }
 

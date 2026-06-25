@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>Router Online Monitor</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
     <key>CFBundleExecutable</key>
     <string>RouterOnlineMonitorMenuBar</string>
     <key>CFBundleIdentifier</key>
@@ -14,6 +16,11 @@
     <string>Router Online Monitor</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>de</string>
+    </array>
     <key>CFBundleShortVersionString</key>
     <string>1.0.14</string>
     <key>CFBundleVersion</key>
