@@ -273,7 +273,7 @@ struct MenuPopoverView: View {
             HStack {
                 Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
                 Spacer()
-                Text("Version 1.0.7")
+                Text("Version 1.0.8")
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)
