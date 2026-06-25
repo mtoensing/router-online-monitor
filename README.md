@@ -20,6 +20,54 @@ Download the latest `Router-Online-Monitor-macOS.zip` from the GitHub releases p
 
 The release app is ad-hoc signed but not Apple-notarized. On first launch, macOS may still require Control-clicking the app and choosing Open. Full click-to-open distribution requires signing and notarizing with an Apple Developer ID certificate.
 
+## Compatible FRITZ!Box models
+
+Router Online Monitor works with FRITZ!Box routers that expose the TR-064 `WANCommonInterfaceConfig` service for WAN statistics. The current FRITZ!Box catalogue lists these compatible models:
+
+### Fibre optic
+
+- FRITZ!Box 5530 Fiber
+- FRITZ!Box 5590 Fiber
+- FRITZ!Box 5690
+- FRITZ!Box 5690 Pro Int.
+- FRITZ!Box 5690 XGS
+
+### DSL and G.fast
+
+- FRITZ!Box 7510
+- FRITZ!Box 7530 AX
+- FRITZ!Box 7590 AX
+- FRITZ!Box 7630
+- FRITZ!Box 7632
+- FRITZ!Box 7682
+- FRITZ!Box 7690
+- FRITZ!Box 5690 Pro Int.
+- FRITZ!Box 6890 LTE
+
+### Cable
+
+- FRITZ!Box 6670 Cable
+- FRITZ!Box 6690 Cable
+
+### Mobile network
+
+- FRITZ!Box 6820 LTE
+- FRITZ!Box 6825 4G
+- FRITZ!Box 6850 LTE
+- FRITZ!Box 6850 5G
+- FRITZ!Box 6860 5G
+- FRITZ!Box 6890 LTE
+
+### Router for modem / network
+
+- FRITZ!Box 4050
+- FRITZ!Box 4630
+- FRITZ!Box 4690
+
+Older, discontinued, regional, or ISP-branded FRITZ!Box models may also work if TR-064 access is enabled and the router exposes `WANCommonInterfaceConfig` in `tr64desc.xml`.
+
+Note: automatic line-rate detection uses the DSL-specific `WANDSLInterfaceConfig` service. On fibre, cable, mobile, or modem/network setups, traffic monitoring can still work, but capacity limits may need to be entered manually.
+
 ## Data model
 
 - Sample interval: 10 seconds.
