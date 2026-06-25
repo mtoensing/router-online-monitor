@@ -20,7 +20,21 @@ Download the latest `Router-Online-Monitor-macOS.zip` from the GitHub releases p
 
 Router Online Monitor is open source and currently released without Apple notarization. The app bundle is ad-hoc signed, but macOS may still block the first launch with “Apple could not verify this app is free of malware.”
 
-If you trust the downloaded release, remove the quarantine attribute after moving the app to `/Applications`:
+If you trust the downloaded release, use one of these first-launch options:
+
+### Option 1: Allow it in System Settings
+
+1. Open `Router Online Monitor.app` once.
+2. When macOS blocks it, choose Done or Cancel.
+3. Open System Settings.
+4. Go to Privacy & Security.
+5. Scroll to the Security section.
+6. Click Open Anyway for Router Online Monitor.
+7. Confirm with Open.
+
+### Option 2: Remove the quarantine attribute
+
+After moving the app to `/Applications`, run:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/Router Online Monitor.app"
