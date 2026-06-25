@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
   <title id="title">Router Online Monitor</title>
-  <desc id="description">A bold white lightning bolt on a red rounded-square background.</desc>
+  <desc id="description">White down and up arrows on a red rounded-square background.</desc>
 
   <rect width="512" height="512" rx="112" fill="#bb1d1b"/>
 
-  <!-- Bolt glyph based on Heroicons Solid, MIT License. -->
-  <path d="M286 64 128 288h102l-29 160 183-256H274l12-128Z" fill="#fff"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="52">
+    <path d="M188 112v288"/>
+    <path d="M104 316l84 84 84-84"/>
+    <path d="M324 400V112"/>
+    <path d="M240 196l84-84 84 84"/>
+  </g>
 </svg>
