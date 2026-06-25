@@ -327,7 +327,7 @@ struct MenuPopoverView: View {
             HStack {
                 Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
                 Spacer()
-                Text("Version 1.0.12")
+                Text("Version 1.0.13")
                     .onTapGesture {
                         registerVersionClick()
                     }
