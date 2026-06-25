@@ -1,0 +1,165 @@
+name: Release new version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment to apply when no explicit version is supplied.
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: Optional explicit semantic version, for example 1.2.3. Overrides bump.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-version
+  cancel-in-progress: false
+
+jobs:
+  release-version:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update app version
+        id: version
+        env:
+          REQUESTED_BUMP: ${{ inputs.bump }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          python3 <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          info_path = Path("Resources/Info.plist")
+          app_path = Path("Sources/FritzBoxBandwidthMenuBar/FritzBoxBandwidthMenuBarApp.swift")
+
+          info = info_path.read_text()
+          app = app_path.read_text()
+
+          semver_pattern = re.compile(r"^\d+\.\d+\.\d+$")
+
+          current_match = re.search(
+              r"<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>",
+              info,
+          )
+          build_match = re.search(
+              r"<key>CFBundleVersion</key>\s*<string>([^<]+)</string>",
+              info,
+          )
+          if not current_match or not build_match:
+              raise SystemExit("Could not find bundle version fields in Resources/Info.plist")
+
+          current_version = current_match.group(1)
+          current_build = build_match.group(1)
+          if not semver_pattern.fullmatch(current_version):
+              raise SystemExit(f"Current version is not semantic x.y.z: {current_version}")
+          if not current_build.isdigit():
+              raise SystemExit(f"Current CFBundleVersion is not an integer: {current_build}")
+
+          requested_version = os.environ.get("REQUESTED_VERSION", "").strip()
+          bump = os.environ["REQUESTED_BUMP"]
+
+          if requested_version:
+              next_version = requested_version
+          else:
+              major, minor, patch = [int(part) for part in current_version.split(".")]
+              if bump == "major":
+                  major += 1
+                  minor = 0
+                  patch = 0
+              elif bump == "minor":
+                  minor += 1
+                  patch = 0
+              elif bump == "patch":
+                  patch += 1
+              else:
+                  raise SystemExit(f"Unsupported bump value: {bump}")
+              next_version = f"{major}.{minor}.{patch}"
+
+          if not semver_pattern.fullmatch(next_version):
+              raise SystemExit(f"Requested version is not semantic x.y.z: {next_version}")
+
+          def version_tuple(value):
+              return tuple(int(part) for part in value.split("."))
+
+          if version_tuple(next_version) <= version_tuple(current_version):
+              raise SystemExit(
+                  f"Next version must be greater than current version "
+                  f"({current_version}); got {next_version}"
+              )
+
+          next_build = str(int(current_build) + 1)
+
+          info = re.sub(
+              r"(<key>CFBundleShortVersionString</key>\s*<string>)[^<]+(</string>)",
+              rf"\g<1>{next_version}\2",
+              info,
+              count=1,
+          )
+          info = re.sub(
+              r"(<key>CFBundleVersion</key>\s*<string>)[^<]+(</string>)",
+              rf"\g<1>{next_build}\2",
+              info,
+              count=1,
+          )
+
+          app, replacements = re.subn(
+              r'Text\("Version \d+\.\d+\.\d+"\)',
+              f'Text("Version {next_version}")',
+              app,
+              count=1,
+          )
+          if replacements != 1:
+              raise SystemExit("Could not update visible in-app version label")
+
+          tag = f"v{next_version}"
+          existing_tag = subprocess.run(
+              ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+          )
+          if existing_tag.returncode == 0:
+              raise SystemExit(f"Tag already exists: {tag}")
+
+          info_path.write_text(info)
+          app_path.write_text(app)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={next_version}\n")
+              output.write(f"build={next_build}\n")
+              output.write(f"tag={tag}\n")
+          PY
+
+      - name: Commit version bump
+        run: |
+          git status --short
+          git add Resources/Info.plist Sources/FritzBoxBandwidthMenuBar/FritzBoxBandwidthMenuBarApp.swift
+          git commit -m "Release FRITZ!Box Bandwidth ${{ steps.version.outputs.version }}"
+
+      - name: Create and push release tag
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          git tag -a "$tag" -m "FRITZ!Box Bandwidth ${{ steps.version.outputs.version }}"
+          git push origin HEAD:main
+          git push origin "$tag"
