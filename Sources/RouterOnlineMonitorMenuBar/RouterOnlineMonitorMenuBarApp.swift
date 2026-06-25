@@ -62,11 +62,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             return
         }
         stopConnectingAnimation()
-        guard let sample = monitor.samples.last else {
+        guard let latestSample = monitor.samples.last else {
             setMenuBarIcon()
             statusItem?.button?.toolTip = monitor.status
             return
         }
+        let sample = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
         let labels = menuBarLabels()
@@ -311,7 +312,8 @@ struct MenuPopoverView: View {
                 .frame(height: 150)
             }
 
-            if let latest = monitor.samples.last {
+            if let latestSample = monitor.samples.last {
+                let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
                 HStack(spacing: 16) {
                     Label("Download \(formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"))", systemImage: "arrow.down").foregroundStyle(.blue)
                     Label("Upload \(formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"))", systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
@@ -385,7 +387,9 @@ struct MenuPopoverView: View {
 
     private var recentSamples: [TrafficSample] {
         let cutoff = Date().addingTimeInterval(-30 * 60)
-        return monitor.samples.filter { $0.recordedAt >= cutoff }
+        return monitor.samples
+            .filter { $0.recordedAt >= cutoff }
+            .map(TrafficRateLimiter.cappedToConfiguredCapacities)
     }
 
     private func registerVersionClick() {
@@ -489,7 +493,7 @@ struct SettingsView: View {
             if showsHiddenSettings {
                 Section("Hidden settings") {
                     TextField("Polling interval (seconds)", value: $pollIntervalSeconds, format: .number)
-                    Text("Minimum 1 second. Short intervals update faster but can look noisier.")
+                    Text("Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -592,6 +596,26 @@ struct TrafficSample: Codable, Identifiable {
     var id: Date { recordedAt }
 }
 
+enum TrafficRateLimiter {
+    static func cappedToConfiguredCapacities(_ sample: TrafficSample) -> TrafficSample {
+        TrafficSample(
+            recordedAt: sample.recordedAt,
+            uploadBitsPerSecond: cappedRate(sample.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"),
+            downloadBitsPerSecond: cappedRate(sample.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit")
+        )
+    }
+
+    private static func cappedRate(_ bitsPerSecond: Double, capacityKey: String) -> Double {
+        guard bitsPerSecond.isFinite else { return 0 }
+        let nonNegativeRate = max(bitsPerSecond, 0)
+        let capacityBitsPerSecond = UserDefaults.standard.double(forKey: capacityKey) * 1_000_000
+        guard capacityBitsPerSecond.isFinite, capacityBitsPerSecond > 0 else {
+            return nonNegativeRate
+        }
+        return min(nonNegativeRate, capacityBitsPerSecond)
+    }
+}
+
 struct DSLLineRates {
     let currentDownstreamMbit: Double
     let currentUpstreamMbit: Double
@@ -684,11 +708,12 @@ final class TrafficMonitor: ObservableObject {
                 if let previous {
                     let elapsed = now.timeIntervalSince(previous.date)
                     if elapsed > 0 {
-                        let sample = TrafficSample(
+                        let rawSample = TrafficSample(
                             recordedAt: now,
                             uploadBitsPerSecond: Double(Self.delta(from: previous.sent, to: counters.sent)) * 8 / elapsed,
                             downloadBitsPerSecond: Double(Self.delta(from: previous.received, to: counters.received)) * 8 / elapsed
                         )
+                        let sample = TrafficRateLimiter.cappedToConfiguredCapacities(rawSample)
                         samples.append(sample)
                         pruneSamples(now: now)
                         storage.save(samples)

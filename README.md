@@ -98,6 +98,7 @@ Note: automatic line-rate detection uses the DSL-specific `WANDSLInterfaceConfig
 - Retention: 12 hours.
 - Data source: FRITZ!Box TR-064 `WANCommonInterfaceConfig` byte counters.
 - Scope: whole-router Internet traffic, not individual devices.
+- Capacity handling: if capacity limits are configured or detected from the router, displayed rates are capped at those limits to suppress impossible spikes from bursty router counter updates.
 
 ## Disclaimer
 
