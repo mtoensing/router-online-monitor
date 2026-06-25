@@ -258,6 +258,9 @@ enum TrafficFormatting {
 
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
+    @State private var showsHiddenSettings = false
+    @State private var versionClickCount = 0
+    @State private var lastVersionClickAt: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -318,12 +321,15 @@ struct MenuPopoverView: View {
             }
 
             Divider()
-            SettingsView(monitor: monitor)
+            SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
             Divider()
             HStack {
                 Text("Unofficial app. Not affiliated with or endorsed by FRITZ!.")
                 Spacer()
                 Text("Version 1.0.10")
+                    .onTapGesture {
+                        registerVersionClick()
+                    }
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -357,15 +363,32 @@ struct MenuPopoverView: View {
         let cutoff = Date().addingTimeInterval(-30 * 60)
         return monitor.samples.filter { $0.recordedAt >= cutoff }
     }
+
+    private func registerVersionClick() {
+        let now = Date()
+        if let lastVersionClickAt, now.timeIntervalSince(lastVersionClickAt) <= 1.5 {
+            versionClickCount += 1
+        } else {
+            versionClickCount = 1
+        }
+        lastVersionClickAt = now
+
+        if versionClickCount >= 5 {
+            showsHiddenSettings = true
+            versionClickCount = 0
+        }
+    }
 }
 
 struct SettingsView: View {
     @ObservedObject var monitor: TrafficMonitor
+    let showsHiddenSettings: Bool
     @AppStorage("routerHost") private var host = "192.168.178.1"
     @AppStorage("routerUsername") private var username = ""
     @AppStorage("menuBarMode") private var menuBarMode = "rate"
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
+    @AppStorage("pollIntervalSeconds") private var pollIntervalSeconds = 5.0
     @AppStorage("downstreamCapacityMbit") private var downstreamCapacityMbit = 0.0
     @AppStorage("upstreamCapacityMbit") private var upstreamCapacityMbit = 0.0
     @State private var password = ""
@@ -439,6 +462,16 @@ struct SettingsView: View {
                 }
             }
 
+            if showsHiddenSettings {
+                Section("Hidden settings") {
+                    TextField("Polling interval (seconds)", value: $pollIntervalSeconds, format: .number)
+                    Text("Minimum 1 second. Short intervals update faster but can look noisier.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             Section {
                 HStack {
                     Spacer()
@@ -466,6 +499,10 @@ struct SettingsView: View {
         }
         .onChange(of: menuBarLabelStyle) { _ in
             monitor.refreshPresentation()
+        }
+        .onChange(of: pollIntervalSeconds) { _ in
+            normalizePollingInterval()
+            monitor.updatePollingInterval()
         }
     }
 
@@ -501,6 +538,12 @@ struct SettingsView: View {
 
     private func format(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+
+    private func normalizePollingInterval() {
+        if pollIntervalSeconds < 1 {
+            pollIntervalSeconds = 1
+        }
     }
 
     private var connectionColor: Color {
@@ -552,11 +595,7 @@ final class TrafficMonitor: ObservableObject {
     init() {
         samples = storage.load()
         lastUpdated = samples.last?.recordedAt
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.poll()
-            }
-        }
+        scheduleTimer()
         poll()
         prepopulateLineCapacities()
     }
@@ -570,6 +609,10 @@ final class TrafficMonitor: ObservableObject {
 
     func refreshPresentation() {
         preferencesVersion += 1
+    }
+
+    func updatePollingInterval() {
+        scheduleTimer()
     }
 
     func prepopulateLineCapacities() {
@@ -652,6 +695,20 @@ final class TrafficMonitor: ObservableObject {
 
     private static func delta(from old: UInt64, to new: UInt64) -> UInt64 {
         new >= old ? new - old : new + (1 << 32) - old
+    }
+
+    private func scheduleTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: Self.pollIntervalSeconds, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.poll()
+            }
+        }
+    }
+
+    private static var pollIntervalSeconds: TimeInterval {
+        let value = UserDefaults.standard.double(forKey: "pollIntervalSeconds")
+        return value >= 1 ? value : 5
     }
 }
 
