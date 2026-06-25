@@ -64,7 +64,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         stopConnectingAnimation()
         guard let sample = monitor.samples.last else {
             setMenuBarIcon()
-            statusItem?.button?.toolTip = "Router Online Monitor: waiting for first sample"
+            statusItem?.button?.toolTip = monitor.status
             return
         }
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
@@ -268,25 +268,24 @@ struct MenuPopoverView: View {
                 Text("Router Online Monitor").font(.headline)
                 Spacer()
                 if monitor.isRefreshing {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Polling…")
-                    }
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(headerStatusLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                } else {
-                    Text(lastUpdatedLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             if recentSamples.isEmpty {
                 VStack(spacing: 6) {
-                    Image(systemName: "chart.xyaxis.line").font(.title2)
-                    Text("Collecting samples").font(.headline)
-                    Text("No samples from the last 30 minutes.").font(.caption).foregroundStyle(.secondary)
+                    if monitor.isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: emptyStateSystemImage).font(.title2)
+                    }
+                    Text(emptyStateTitle).font(.headline)
+                    Text(emptyStateMessage).font(.caption).foregroundStyle(.secondary)
                 }
                     .frame(height: 130)
             } else {
@@ -354,9 +353,34 @@ struct MenuPopoverView: View {
         return "\(format(bitsPerSecond)) (\(String(format: "%.0f%%", bitsPerSecond / capacity * 100)))"
     }
 
-    private var lastUpdatedLabel: String {
-        guard let lastUpdated = monitor.lastUpdated else { return "No data yet" }
+    private var headerStatusLabel: String {
+        if monitor.isRefreshing { return "Polling…" }
+        guard let lastUpdated = monitor.lastUpdated else { return monitor.status }
         return "Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private var emptyStateTitle: String {
+        if monitor.status == "Enter router credentials below" { return "Setup required" }
+        if monitor.isRefreshing { return "Polling router" }
+        if monitor.lastUpdated != nil { return "Waiting for second sample" }
+        return "Waiting for router"
+    }
+
+    private var emptyStateMessage: String {
+        if monitor.status == "Enter router credentials below" {
+            return "Enter router credentials below, then save and connect."
+        }
+        if monitor.isRefreshing {
+            return "Reading traffic counters from the router…"
+        }
+        if monitor.lastUpdated != nil {
+            return "Connected. The first traffic rate appears after the next poll."
+        }
+        return monitor.status
+    }
+
+    private var emptyStateSystemImage: String {
+        monitor.status == "Enter router credentials below" ? "gearshape" : "chart.xyaxis.line"
     }
 
     private var recentSamples: [TrafficSample] {
@@ -578,6 +602,7 @@ struct DSLLineRates {
 @MainActor
 final class TrafficMonitor: ObservableObject {
     static let shared = TrafficMonitor()
+    private static let maximumStoredSamples = 10_000
     @Published private(set) var samples: [TrafficSample] = []
     @Published private(set) var status = "Enter router credentials below"
     @Published private(set) var preferencesVersion = 0
@@ -665,16 +690,20 @@ final class TrafficMonitor: ObservableObject {
                             downloadBitsPerSecond: Double(Self.delta(from: previous.received, to: counters.received)) * 8 / elapsed
                         )
                         samples.append(sample)
-                        samples.removeAll { $0.recordedAt < now.addingTimeInterval(-12 * 3600) }
+                        pruneSamples(now: now)
                         storage.save(samples)
                     }
+                } else {
+                    status = "Connected. Waiting for second sample…"
                 }
                 previous = (now, counters.sent, counters.received)
                 consecutivePollFailures = 0
                 isConnected = true
                 isConnecting = false
                 lastUpdated = now
-                status = "Updated \(now.formatted(date: .omitted, time: .shortened))"
+                if !samples.isEmpty {
+                    status = "Updated \(now.formatted(date: .omitted, time: .shortened))"
+                }
             } catch {
                 consecutivePollFailures += 1
                 if consecutivePollFailures >= 3 {
@@ -695,6 +724,13 @@ final class TrafficMonitor: ObservableObject {
 
     private static func delta(from old: UInt64, to new: UInt64) -> UInt64 {
         new >= old ? new - old : new + (1 << 32) - old
+    }
+
+    private func pruneSamples(now: Date) {
+        samples.removeAll { $0.recordedAt < now.addingTimeInterval(-12 * 3600) }
+        if samples.count > Self.maximumStoredSamples {
+            samples.removeFirst(samples.count - Self.maximumStoredSamples)
+        }
     }
 
     private func scheduleTimer() {
@@ -866,6 +902,7 @@ private extension Array where Element: Hashable {
 }
 
 final class SampleStorage {
+    private static let maximumStoredSamples = 10_000
     private let url: URL
 
     init() {
@@ -876,7 +913,11 @@ final class SampleStorage {
 
     func load() -> [TrafficSample] {
         guard let data = try? Data(contentsOf: url), let samples = try? JSONDecoder().decode([TrafficSample].self, from: data) else { return [] }
-        return samples.filter { $0.recordedAt > Date().addingTimeInterval(-12 * 3600) }
+        let retainedSamples = samples.filter { $0.recordedAt > Date().addingTimeInterval(-12 * 3600) }
+        if retainedSamples.count > Self.maximumStoredSamples {
+            return Array(retainedSamples.suffix(Self.maximumStoredSamples))
+        }
+        return retainedSamples
     }
 
     func save(_ samples: [TrafficSample]) {
