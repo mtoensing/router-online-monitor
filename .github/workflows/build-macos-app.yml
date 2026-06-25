@@ -30,7 +30,7 @@ jobs:
       - name: Archive app bundle
         run: ditto -c -k --sequesterRsrc --keepParent "Router Online Monitor.app" Router-Online-Monitor-macOS.zip
 
-      - name: Upload unsigned app archive
+      - name: Upload app archive
         uses: actions/upload-artifact@v4
         with:
           name: Router-Online-Monitor-macOS

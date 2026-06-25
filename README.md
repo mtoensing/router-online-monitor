@@ -14,7 +14,11 @@ A native macOS menu-bar app for monitoring router Internet traffic. It connects 
 
 Requirements: macOS 13 or newer and Xcode (or the Xcode Command Line Tools).
 
-The development bundle above is unsigned. For normal distribution or automatic launch at login, create an Xcode macOS App target and sign/notarize it with your Apple Developer identity.
+## Installation
+
+Download the latest `Router-Online-Monitor-macOS.zip` from the GitHub releases page and move `Router Online Monitor.app` to `/Applications`.
+
+The release app is ad-hoc signed but not Apple-notarized. On first launch, macOS may still require Control-clicking the app and choosing Open. Full click-to-open distribution requires signing and notarizing with an Apple Developer ID certificate.
 
 ## Data model
 
