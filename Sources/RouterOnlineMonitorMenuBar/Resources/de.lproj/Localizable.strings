@@ -1,6 +1,7 @@
 "app.name" = "Router Online Monitor";
 "app.version" = "Version %@";
 "button.findRouter" = "Router suchen";
+"button.moreInfo" = "Weitere Informationen";
 "button.quit" = "Beenden";
 "button.refreshNow" = "Jetzt aktualisieren";
 "button.saveAndConnect" = "Speichern und verbinden";
@@ -35,6 +36,7 @@
 "help.menuBarDisplay.rectangles" = "Zeigt kompakte Nutzungsrechtecke anhand der erforderlichen Leitungslimits.";
 "help.pollingInterval" = "Mindestens 1 Sekunde. Werte unter 5 Sekunden können unruhiger wirken, weil manche Router Verkehrszähler in Bursts aktualisieren.";
 "help.showOneDecimalPlace" = "Gilt für die Verkehrsrate als Werteanzeige in der Menüleiste.";
+"help.toggleConfig" = "Konfiguration ein- oder ausklappen";
 "lineRate.currentAndMax" = "%@ Mbit/s (max. %@)";
 "lineRate.detectedDownstream" = "Erkannter Downstream";
 "lineRate.detectedUpstream" = "Erkannter Upstream";

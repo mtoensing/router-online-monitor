@@ -1,6 +1,7 @@
 "app.name" = "Router Online Monitor";
 "app.version" = "Version %@";
 "button.findRouter" = "Find Router";
+"button.moreInfo" = "More Information";
 "button.quit" = "Quit";
 "button.refreshNow" = "Refresh Now";
 "button.saveAndConnect" = "Save and Connect";
@@ -35,6 +36,7 @@
 "help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the required line speed limits.";
 "help.pollingInterval" = "Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.";
 "help.showOneDecimalPlace" = "Applies to the traffic-rate value display in the menu bar.";
+"help.toggleConfig" = "Expand or collapse configuration";
 "lineRate.currentAndMax" = "%@ Mbit/s (max %@)";
 "lineRate.detectedDownstream" = "Detected downstream";
 "lineRate.detectedUpstream" = "Detected upstream";

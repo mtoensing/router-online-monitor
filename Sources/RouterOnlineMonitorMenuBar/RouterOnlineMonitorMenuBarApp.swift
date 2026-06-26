@@ -552,28 +552,51 @@ struct MenuPopoverView: View {
     }
 
     private var configCard: some View {
-        DisclosureGroup(isExpanded: $isConfigPanelExpanded) {
-            SettingsView(
-                monitor: monitor,
-                showsHiddenSettings: showsHiddenSettings,
-                onSaved: {
-                    isConfigPanelExpanded = false
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isConfigPanelExpanded.toggle()
                 }
-            )
-            .padding(.top, 10)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundStyle(.secondary)
-                Text(L10n.string("section.config"))
-                    .font(.headline)
-                Spacer()
-                Text(configSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isConfigPanelExpanded ? 90 : 0))
+                        .frame(width: 12)
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(.secondary)
+                    Text(L10n.string("section.config"))
+                        .font(.headline)
+                    Spacer()
+                    Text(configSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.string("section.config"))
+            .help(L10n.string("help.toggleConfig"))
+
+            if isConfigPanelExpanded {
+                Divider()
+                    .padding(.horizontal, 14)
+
+                SettingsView(
+                    monitor: monitor,
+                    showsHiddenSettings: showsHiddenSettings,
+                    onSaved: {
+                        isConfigPanelExpanded = false
+                    }
+                )
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
             }
         }
-        .padding(12)
         .popoverCard()
     }
 
@@ -730,6 +753,32 @@ private extension View {
     }
 }
 
+private struct HelpPopoverButton: View {
+    let text: String
+    @State private var isPresented = false
+
+    var body: some View {
+        Button {
+            isPresented.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(text)
+        .accessibilityLabel(L10n.string("button.moreInfo"))
+        .popover(isPresented: $isPresented) {
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(12)
+                .frame(width: 280, alignment: .leading)
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var monitor: TrafficMonitor
     let showsHiddenSettings: Bool
@@ -780,10 +829,6 @@ struct SettingsView: View {
             formSeparator
 
             Section {
-                Text(L10n.string("help.capacityLimits"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                 if needsCapacityValues {
                     Label(L10n.string("warning.capacityLimitsRequired"), systemImage: "exclamationmark.triangle")
                         .font(.caption)
@@ -809,7 +854,10 @@ struct SettingsView: View {
                     Text(L10n.string("lineRate.reading")).font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
-                Text(L10n.string("section.capacityLimits"))
+                HStack(spacing: 5) {
+                    Text(L10n.string("section.capacityLimits"))
+                    HelpPopoverButton(text: L10n.string("help.capacityLimits"))
+                }
             }
 
             formSeparator
@@ -877,6 +925,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
         .onAppear {
             password = Keychain.password() ?? ""
             detectLineRates()
@@ -904,7 +953,7 @@ struct SettingsView: View {
 
     private var formSeparator: some View {
         Divider()
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
     }
 
     private func detectLineRates() {

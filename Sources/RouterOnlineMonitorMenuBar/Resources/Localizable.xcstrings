@@ -49,6 +49,22 @@
         }
       }
     },
+    "button.moreInfo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Informationen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More Information"
+          }
+        }
+      }
+    },
     "button.quit" : {
       "localizations" : {
         "de" : {
@@ -589,6 +605,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Applies to the traffic-rate value display in the menu bar."
+          }
+        }
+      }
+    },
+    "help.toggleConfig" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfiguration ein- oder ausklappen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expand or collapse configuration"
           }
         }
       }
