@@ -689,6 +689,11 @@ struct SettingsView: View {
 
             Section {
                 HStack {
+                    if saved {
+                        Label(L10n.string("status.savedToKeychain"), systemImage: "checkmark.circle")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     Spacer()
                     Button(L10n.string("button.saveAndConnect")) {
                         Keychain.save(password: password)
@@ -697,11 +702,6 @@ struct SettingsView: View {
                         detectLineRates()
                     }
                     .keyboardShortcut(.defaultAction)
-                    if saved {
-                        Text(L10n.string("status.savedToKeychain"))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                 }
             }
         }
