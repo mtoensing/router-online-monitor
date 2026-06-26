@@ -470,11 +470,8 @@ struct MenuPopoverView: View {
             }
 
             Divider().padding(.top, 2)
-            ScrollView {
-                SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
-                    .padding(.trailing, 8)
-            }
-            .frame(maxHeight: 360)
+            SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
+                .frame(maxHeight: 360)
             Divider().padding(.top, 2)
             HStack {
                 Text(L10n.string("disclaimer.short"))
