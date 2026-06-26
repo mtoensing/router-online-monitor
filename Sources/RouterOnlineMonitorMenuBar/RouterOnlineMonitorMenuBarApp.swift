@@ -427,8 +427,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         window.setFrame(frame, display: true)
     }
 
-    private func updatePopoverContentSize(_ size: CGSize) {
-        let contentSize = CGSize(width: ceil(size.width), height: ceil(size.height))
+    private func updatePopoverContentSize(_ contentSize: CGSize) {
         guard contentSize.width > 0, contentSize.height > 0,
               abs(contentSize.width - currentPopoverContentSize.width) > 0.5 ||
               abs(contentSize.height - currentPopoverContentSize.height) > 0.5 else { return }
@@ -483,14 +482,18 @@ struct MenuPopoverView: View {
         }
         .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
-        .frame(minHeight: minimumPopoverHeight, maxHeight: maximumPopoverHeight)
+        .frame(height: targetPopoverHeight)
         .background(Color(nsColor: .windowBackgroundColor))
-        .reportSize(onContentSizeChange)
         .onAppear {
             applyDefaultConfigPanelState()
+            publishTargetContentSize()
         }
         .onChange(of: monitor.isConnected) { _ in
             applyDefaultConfigPanelState()
+            publishTargetContentSize()
+        }
+        .onChange(of: isConfigPanelExpanded) { _ in
+            publishTargetContentSize()
         }
     }
 
@@ -499,12 +502,24 @@ struct MenuPopoverView: View {
         return max(420, visibleHeight - PopoverLayout.maximumScreenMargin)
     }
 
-    private var minimumPopoverHeight: CGFloat? {
-        isConfigPanelExpanded ? min(720, maximumPopoverHeight) : nil
+    private var targetPopoverHeight: CGFloat {
+        isConfigPanelExpanded ? expandedPopoverHeight : collapsedPopoverHeight
+    }
+
+    private var collapsedPopoverHeight: CGFloat {
+        min(540, maximumPopoverHeight)
+    }
+
+    private var expandedPopoverHeight: CGFloat {
+        min(720, maximumPopoverHeight)
     }
 
     private var maximumSettingsHeight: CGFloat {
-        max(240, (minimumPopoverHeight ?? maximumPopoverHeight) - 430)
+        max(240, expandedPopoverHeight - 430)
+    }
+
+    private func publishTargetContentSize() {
+        onContentSizeChange(CGSize(width: 540, height: ceil(targetPopoverHeight)))
     }
 
     private var header: some View {
@@ -796,26 +811,9 @@ private struct PopoverCardModifier: ViewModifier {
     }
 }
 
-private struct ViewSizePreferenceKey: PreferenceKey {
-    static var defaultValue = CGSize.zero
-
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
-    }
-}
-
 private extension View {
     func popoverCard() -> some View {
         modifier(PopoverCardModifier())
-    }
-
-    func reportSize(_ onChange: @escaping (CGSize) -> Void) -> some View {
-        background {
-            GeometryReader { proxy in
-                Color.clear.preference(key: ViewSizePreferenceKey.self, value: proxy.size)
-            }
-        }
-        .onPreferenceChange(ViewSizePreferenceKey.self, perform: onChange)
     }
 }
 
