@@ -93,52 +93,30 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let sample = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
-        let labels = menuBarLabels()
-        let mode = UserDefaults.standard.string(forKey: "menuBarMode") ?? "rate"
-        if mode == "percentage" {
-            setMenuBarText(
-                download: formatPercent(sample.downloadBitsPerSecond, capacity: downCapacity),
-                upload: formatPercent(sample.uploadBitsPerSecond, capacity: upCapacity),
-                downloadLabel: labels.download,
-                uploadLabel: labels.upload,
-                downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-                uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
-            )
-            statusItem?.button?.toolTip = L10n.string("menubar.tooltip.percentage")
-        } else {
-            setMenuBarText(
-                download: TrafficFormatting.compactMbit(sample.downloadBitsPerSecond),
-                upload: TrafficFormatting.compactMbit(sample.uploadBitsPerSecond),
-                downloadLabel: labels.download,
-                uploadLabel: labels.upload,
-                downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-                uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
-            )
-            statusItem?.button?.toolTip = L10n.string("menubar.tooltip.rate")
-        }
+        setMenuBarUsageBars(
+            sample: sample,
+            downCapacity: downCapacity,
+            upCapacity: upCapacity,
+            labels: menuBarLabels()
+        )
+        statusItem?.button?.toolTip = menuBarTooltip(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity)
     }
 
-    private func setMenuBarText(download: String, upload: String, downloadLabel: String, uploadLabel: String, downloadNearCapacity: Bool, uploadNearCapacity: Bool) {
+    private func setMenuBarUsageBars(sample: TrafficSample, downCapacity: Double, upCapacity: Double, labels: (download: String, upload: String)) {
         guard let button = statusItem?.button else { return }
-        statusItem?.length = NSStatusItem.variableLength
-        button.image = nil
-        button.imagePosition = .noImage
-        let downloadText = "\(downloadLabel) \(download)"
-        let uploadText = "\(uploadLabel) \(upload)"
-        let attributed = NSMutableAttributedString(
-            string: "\(downloadText)  \(uploadText)",
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-                .foregroundColor: NSColor.labelColor,
-            ]
+        let image = Self.menuBarUsageImage(
+            downloadFraction: usageFraction(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadFraction: usageFraction(sample.uploadBitsPerSecond, capacity: upCapacity),
+            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity),
+            downloadLabel: labels.download,
+            uploadLabel: labels.upload
         )
-        if downloadNearCapacity {
-            attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: 0, length: downloadText.utf16.count))
-        }
-        if uploadNearCapacity {
-            attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: downloadText.utf16.count + 2, length: uploadText.utf16.count))
-        }
-        button.attributedTitle = attributed
+        statusItem?.length = image.size.width + 8
+        button.title = ""
+        button.attributedTitle = NSAttributedString()
+        button.image = image
+        button.imagePosition = .imageOnly
     }
 
     private func setMenuBarIcon() {
@@ -153,6 +131,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func menuBarLabels() -> (download: String, upload: String) {
         switch UserDefaults.standard.string(forKey: "menuBarLabelStyle") ?? "arrows" {
         case "arrows": return ("↓", "↑")
+        case "short": return ("D", "U")
         case "words": return ("↓ \(L10n.string("traffic.download"))", "↑ \(L10n.string("traffic.upload"))")
         case "network": return ("Rx", "Tx")
         case "direction": return (L10n.string("traffic.in"), L10n.string("traffic.out"))
@@ -207,6 +186,103 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return image
     }
 
+    private static func menuBarUsageImage(
+        downloadFraction: Double,
+        uploadFraction: Double,
+        downloadNearCapacity: Bool,
+        uploadNearCapacity: Bool,
+        downloadLabel: String,
+        uploadLabel: String
+    ) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        let labelColor = NSColor.labelColor
+        let downloadColor = downloadNearCapacity ? NSColor.systemRed : labelColor
+        let uploadColor = uploadNearCapacity ? NSColor.systemRed : labelColor
+        let measuringAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+        ]
+        let labelGap: CGFloat = 2
+        let groupGap: CGFloat = 5
+        let barSize = NSSize(width: 5.5, height: 11.5)
+        let imageHeight: CGFloat = 18
+        let downloadSize = (downloadLabel as NSString).size(withAttributes: measuringAttributes)
+        let uploadSize = (uploadLabel as NSString).size(withAttributes: measuringAttributes)
+        let imageWidth = ceil(downloadSize.width + labelGap + barSize.width + groupGap + uploadSize.width + labelGap + barSize.width)
+
+        let image = NSImage(size: NSSize(width: imageWidth, height: imageHeight), flipped: false) { _ in
+            let baselineY = floor((imageHeight - max(downloadSize.height, uploadSize.height)) / 2)
+            let barY = floor((imageHeight - barSize.height) / 2)
+            var x: CGFloat = 0
+
+            drawMenuBarUsageGroup(
+                label: downloadLabel,
+                labelSize: downloadSize,
+                fraction: downloadFraction,
+                x: &x,
+                baselineY: baselineY,
+                barY: barY,
+                barSize: barSize,
+                labelGap: labelGap,
+                color: downloadColor,
+                font: font
+            )
+            x += groupGap
+            drawMenuBarUsageGroup(
+                label: uploadLabel,
+                labelSize: uploadSize,
+                fraction: uploadFraction,
+                x: &x,
+                baselineY: baselineY,
+                barY: barY,
+                barSize: barSize,
+                labelGap: labelGap,
+                color: uploadColor,
+                font: font
+            )
+            return true
+        }
+        return image
+    }
+
+    private static func drawMenuBarUsageGroup(
+        label: String,
+        labelSize: NSSize,
+        fraction: Double,
+        x: inout CGFloat,
+        baselineY: CGFloat,
+        barY: CGFloat,
+        barSize: NSSize,
+        labelGap: CGFloat,
+        color: NSColor,
+        font: NSFont
+    ) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+        ]
+        color.set()
+        (label as NSString).draw(at: NSPoint(x: x, y: baselineY), withAttributes: attributes)
+        x += labelSize.width + labelGap
+
+        let stroke = NSBezierPath(rect: NSRect(x: x, y: barY, width: barSize.width, height: barSize.height))
+        stroke.lineWidth = 1
+        stroke.stroke()
+
+        let inset: CGFloat = 1.4
+        let fillHeight = max(0, (barSize.height - inset * 2) * CGFloat(min(max(fraction, 0), 1)))
+        if fillHeight > 0 {
+            let visibleFillHeight = max(fillHeight, 1)
+            NSBezierPath(rect: NSRect(
+                x: x + inset,
+                y: barY + inset,
+                width: barSize.width - inset * 2,
+                height: min(visibleFillHeight, barSize.height - inset * 2)
+            )).fill()
+        }
+
+        x += barSize.width
+    }
+
     private func startConnectingAnimation() {
         guard connectingAnimationTimer == nil else { return }
         updateConnectingTitle()
@@ -229,13 +305,34 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         setMenuBarTitle(L10n.string("status.connecting") + String(repeating: ".", count: connectingAnimationStep))
     }
 
-    private func formatPercent(_ bitsPerSecond: Double, capacity: Double) -> String {
-        guard capacity > 0 else { return "—" }
-        return String(format: "%.0f%%", bitsPerSecond / capacity * 100)
+    private func usageFraction(_ bitsPerSecond: Double, capacity: Double) -> Double {
+        guard capacity.isFinite, capacity > 0, bitsPerSecond.isFinite else { return 0 }
+        return min(max(bitsPerSecond / capacity, 0), 1)
     }
 
     private func isNearCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
         capacity > 0 && bitsPerSecond >= capacity * 0.95
+    }
+
+    private func menuBarTooltip(sample: TrafficSample, downCapacity: Double, upCapacity: Double) -> String {
+        let download = menuBarTooltipLine(
+            label: L10n.string("traffic.download"),
+            bitsPerSecond: sample.downloadBitsPerSecond,
+            capacity: downCapacity
+        )
+        let upload = menuBarTooltipLine(
+            label: L10n.string("traffic.upload"),
+            bitsPerSecond: sample.uploadBitsPerSecond,
+            capacity: upCapacity
+        )
+        return "\(download)\n\(upload)"
+    }
+
+    private func menuBarTooltipLine(label: String, bitsPerSecond: Double, capacity: Double) -> String {
+        guard capacity > 0 else {
+            return "\(label): \(TrafficFormatting.compactMbit(bitsPerSecond))"
+        }
+        return "\(label): \(TrafficFormatting.compactMbit(bitsPerSecond)) (\(String(format: "%.0f%%", usageFraction(bitsPerSecond, capacity: capacity) * 100)))"
     }
 
     @objc private func togglePopover() {
@@ -440,7 +537,6 @@ struct SettingsView: View {
     let showsHiddenSettings: Bool
     @AppStorage("routerHost") private var host = "192.168.178.1"
     @AppStorage("routerUsername") private var username = ""
-    @AppStorage("menuBarMode") private var menuBarMode = "rate"
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
     @AppStorage("pollIntervalSeconds") private var pollIntervalSeconds = 5.0
@@ -482,10 +578,6 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarMode) {
-                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
-                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
-                }
                 Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
                     Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
                     Text(L10n.string("picker.menuBarLabels.short")).tag("short")
@@ -547,9 +639,6 @@ struct SettingsView: View {
             detectLineRates()
         }
         .onChange(of: showOneDecimalMbit) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: menuBarMode) { _ in
             monitor.refreshPresentation()
         }
         .onChange(of: menuBarLabelStyle) { _ in
