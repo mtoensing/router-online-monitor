@@ -458,15 +458,8 @@ struct MenuPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PopoverLayout.cardSpacing) {
             header
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: PopoverLayout.cardSpacing) {
-                    monitoringCard
-                    configCard
-                }
-                .padding(.vertical, 1)
-            }
-            .scrollIndicators(.automatic)
-            .layoutPriority(1)
+            monitoringCard
+            configCard
             footer
             actionBar
         }
@@ -485,6 +478,10 @@ struct MenuPopoverView: View {
     private var maximumPopoverHeight: CGFloat {
         let visibleHeight = NSScreen.main?.visibleFrame.height ?? 760
         return max(560, visibleHeight - PopoverLayout.maximumScreenMargin)
+    }
+
+    private var maximumSettingsHeight: CGFloat {
+        max(220, maximumPopoverHeight - 430)
     }
 
     private var header: some View {
@@ -610,17 +607,21 @@ struct MenuPopoverView: View {
                 Divider()
                     .padding(.horizontal, PopoverLayout.cardPadding)
 
-                SettingsView(
-                    monitor: monitor,
-                    showsHiddenSettings: showsHiddenSettings,
-                    onSaved: {
-                        configPanelUserPreferenceSet = false
-                        applyDefaultConfigPanelState()
-                    }
-                )
-                .padding(.horizontal, PopoverLayout.formHorizontalPadding)
-                .padding(.top, PopoverLayout.cardPadding)
-                .padding(.bottom, PopoverLayout.cardPadding)
+                ScrollView(.vertical) {
+                    SettingsView(
+                        monitor: monitor,
+                        showsHiddenSettings: showsHiddenSettings,
+                        onSaved: {
+                            configPanelUserPreferenceSet = false
+                            applyDefaultConfigPanelState()
+                        }
+                    )
+                    .padding(.horizontal, PopoverLayout.formHorizontalPadding)
+                    .padding(.top, PopoverLayout.cardPadding)
+                    .padding(.bottom, PopoverLayout.cardPadding)
+                }
+                .scrollIndicators(.automatic)
+                .frame(maxHeight: maximumSettingsHeight)
             }
         }
         .popoverCard()
