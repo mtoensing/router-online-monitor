@@ -475,7 +475,7 @@ struct MenuPopoverView: View {
             HStack {
                 Text(L10n.string("disclaimer.short"))
                 Spacer()
-                Text(L10n.format("app.version", "1.0.18"))
+                Text(L10n.format("app.version", "1.0.19"))
                     .onTapGesture {
                         registerVersionClick()
                     }
