@@ -1,5 +1,7 @@
 # Router Online Monitor
 
+[English](README.md) | [Deutsch](README.de.md)
+
 <p align="center">
   <img src="docs/images/router-online-monitor-logo.svg" alt="Router Online Monitor app icon: white down and up arrows on a red background" width="180">
 </p>
