@@ -468,12 +468,12 @@ struct MenuPopoverView: View {
                     Label(L10n.format("traffic.uploadWithValue", formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit")), systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
                 }
                 .font(.headline)
+                .padding(.bottom, 6)
             }
 
-            Divider().padding(.top, 2)
+            Divider().padding(.vertical, 4)
             SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
-                .frame(maxHeight: 360)
-            Divider().padding(.top, 2)
+            Divider().padding(.vertical, 4)
             HStack {
                 Text(L10n.string("disclaimer.short"))
                 Spacer()
@@ -697,7 +697,11 @@ struct SettingsView: View {
                         detectLineRates()
                     }
                     .keyboardShortcut(.defaultAction)
-                    if saved { Text(L10n.string("status.savedToKeychain")).foregroundStyle(.secondary) }
+                    if saved {
+                        Text(L10n.string("status.savedToKeychain"))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
         }
