@@ -607,6 +607,8 @@ struct SettingsView: View {
                 }
             }
 
+            formSeparator
+
             Section {
                 Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
                     Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
@@ -633,6 +635,8 @@ struct SettingsView: View {
                 Text(menuBarDisplayHelp)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            formSeparator
 
             Section {
                 Text(L10n.string("help.capacityLimits"))
@@ -668,6 +672,8 @@ struct SettingsView: View {
             }
 
             if showsHiddenSettings {
+                formSeparator
+
                 Section(L10n.string("section.hiddenSettings")) {
                     TextField(L10n.string("field.pollingInterval"), value: $pollIntervalSeconds, format: .number)
                     Text(L10n.string("help.pollingInterval"))
@@ -676,6 +682,8 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            formSeparator
 
             Section {
                 HStack {
@@ -715,6 +723,11 @@ struct SettingsView: View {
             normalizePollingInterval()
             monitor.updatePollingInterval()
         }
+    }
+
+    private var formSeparator: some View {
+        Divider()
+            .padding(.vertical, 6)
     }
 
     private func detectLineRates() {
