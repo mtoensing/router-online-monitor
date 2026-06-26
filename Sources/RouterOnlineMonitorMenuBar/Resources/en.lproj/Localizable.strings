@@ -4,7 +4,7 @@
 "button.quit" = "Quit";
 "button.refreshNow" = "Refresh Now";
 "button.saveAndConnect" = "Save and Connect";
-"button.useRouterLineRate" = "Use Router Line Rate";
+"button.useRouterLineRate" = "Use Detected Line Speed";
 "chart.axis.time" = "Time";
 "chart.series.direction" = "Direction";
 "connection.connected" = "Connected";
@@ -21,16 +21,16 @@
 "error.invalidHost" = "Invalid host";
 "error.invalidResponse" = "Unexpected API response";
 "error.requestFailed" = "Request failed";
-"field.downstreamCapacity" = "Downstream (Mbit/s)";
+"field.downstreamCapacity" = "Max downstream (Mbit/s)";
 "field.password" = "Password";
 "field.pollingInterval" = "Polling interval (seconds)";
 "field.routerHost" = "Router host";
-"field.upstreamCapacity" = "Upstream (Mbit/s)";
+"field.upstreamCapacity" = "Max upstream (Mbit/s)";
 "field.username" = "Username";
-"help.capacityLimits" = "Required for rectangles and percentage display. If the router line rate cannot be detected, enter the downstream and upstream limits manually.";
-"help.menuBarDisplay.percentage" = "Shows current traffic as percentages of the capacity limits below.";
+"help.capacityLimits" = "Required. Set the maximum downstream and upstream line speeds used for rectangles, percentages, and near-capacity warnings. If automatic detection is unavailable, enter both values manually.";
+"help.menuBarDisplay.percentage" = "Shows current traffic as percentages of the required line speed limits.";
 "help.menuBarDisplay.rate" = "Shows current traffic as values. Decimal precision applies only to this value display.";
-"help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the capacity limits below.";
+"help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the required line speed limits.";
 "help.pollingInterval" = "Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.";
 "help.showOneDecimalPlace" = "Applies to the traffic-rate value display in the menu bar.";
 "lineRate.currentAndMax" = "%@ Mbit/s (max %@)";
@@ -54,7 +54,7 @@
 "routerDiscovery.found" = "Found router at %@.";
 "routerDiscovery.notFound" = "Could not find a compatible router on the local network.";
 "routerDiscovery.searching" = "Searching the local network…";
-"section.capacityLimits" = "Capacity limits";
+"section.capacityLimits" = "Required line speed limits";
 "section.hiddenSettings" = "Hidden settings";
 "section.menuBar" = "Menu bar";
 "section.routerConnection" = "Router connection";
@@ -78,4 +78,4 @@
 "traffic.out" = "Out";
 "traffic.upload" = "Upload";
 "traffic.uploadWithValue" = "Upload %@";
-"warning.capacityLimitsRequired" = "Enter downstream and upstream limits manually if automatic detection is unavailable.";
+"warning.capacityLimitsRequired" = "Maximum downstream and upstream values are required. Enter both manually if automatic detection is unavailable.";

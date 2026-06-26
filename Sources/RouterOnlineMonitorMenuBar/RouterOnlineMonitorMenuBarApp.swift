@@ -610,35 +610,6 @@ struct SettingsView: View {
             formSeparator
 
             Section {
-                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
-                    Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
-                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
-                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
-                }
-                if menuBarDisplayStyle == "rate" {
-                    Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
-                    Text(L10n.string("help.showOneDecimalPlace"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
-                    Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
-                    Text(L10n.string("picker.menuBarLabels.short")).tag("short")
-                    Text(L10n.string("picker.menuBarLabels.words")).tag("words")
-                    Text(L10n.string("picker.menuBarLabels.network")).tag("network")
-                    Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
-                }
-            } header: {
-                Text(L10n.string("section.menuBar"))
-            } footer: {
-                Text(menuBarDisplayHelp)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            formSeparator
-
-            Section {
                 Text(L10n.string("help.capacityLimits"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -669,6 +640,35 @@ struct SettingsView: View {
                 }
             } header: {
                 Text(L10n.string("section.capacityLimits"))
+            }
+
+            formSeparator
+
+            Section {
+                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
+                    Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
+                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
+                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
+                }
+                if menuBarDisplayStyle == "rate" {
+                    Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
+                    Text(L10n.string("help.showOneDecimalPlace"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
+                    Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
+                    Text(L10n.string("picker.menuBarLabels.short")).tag("short")
+                    Text(L10n.string("picker.menuBarLabels.words")).tag("words")
+                    Text(L10n.string("picker.menuBarLabels.network")).tag("network")
+                    Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
+                }
+            } header: {
+                Text(L10n.string("section.menuBar"))
+            } footer: {
+                Text(menuBarDisplayHelp)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if showsHiddenSettings {

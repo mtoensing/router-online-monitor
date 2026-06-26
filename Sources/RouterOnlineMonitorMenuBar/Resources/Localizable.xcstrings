@@ -102,13 +102,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Router-Leitungsrate verwenden"
+            "value" : "Erkannte Leitungsgeschwindigkeit verwenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use Router Line Rate"
+            "value" : "Use Detected Line Speed"
           }
         }
       }
@@ -374,13 +374,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Downstream (Mbit/s)"
+            "value" : "Max. Downstream (Mbit/s)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Downstream (Mbit/s)"
+            "value" : "Max downstream (Mbit/s)"
           }
         }
       }
@@ -438,13 +438,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Upstream (Mbit/s)"
+            "value" : "Max. Upstream (Mbit/s)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Upstream (Mbit/s)"
+            "value" : "Max upstream (Mbit/s)"
           }
         }
       }
@@ -470,13 +470,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erforderlich für Rechtecke und Prozentanzeige. Wenn die Router-Leitungsrate nicht erkannt werden kann, Downstream- und Upstream-Grenzen manuell eingeben."
+            "value" : "Erforderlich. Maximale Downstream- und Upstream-Leitungsgeschwindigkeiten für Rechtecke, Prozentwerte und Warnungen nahe der Kapazitätsgrenze festlegen. Wenn die automatische Erkennung nicht verfügbar ist, beide Werte manuell eingeben."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Required for rectangles and percentage display. If the router line rate cannot be detected, enter the downstream and upstream limits manually."
+            "value" : "Required. Set the maximum downstream and upstream line speeds used for rectangles, percentages, and near-capacity warnings. If automatic detection is unavailable, enter both values manually."
           }
         }
       }
@@ -486,13 +486,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeigt den aktuellen Verkehr als Prozentwerte der Kapazitätsgrenzen unten."
+            "value" : "Zeigt den aktuellen Verkehr als Prozentwerte der erforderlichen Leitungslimits."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows current traffic as percentages of the capacity limits below."
+            "value" : "Shows current traffic as percentages of the required line speed limits."
           }
         }
       }
@@ -518,13 +518,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeigt kompakte Nutzungsrechtecke anhand der Kapazitätsgrenzen unten."
+            "value" : "Zeigt kompakte Nutzungsrechtecke anhand der erforderlichen Leitungslimits."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows compact usage rectangles based on the capacity limits below."
+            "value" : "Shows compact usage rectangles based on the required line speed limits."
           }
         }
       }
@@ -902,13 +902,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kapazitätsgrenzen"
+            "value" : "Erforderliche Leitungslimits"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Capacity limits"
+            "value" : "Required line speed limits"
           }
         }
       }
@@ -1286,13 +1286,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Downstream- und Upstream-Grenzen manuell eingeben, wenn die automatische Erkennung nicht verfügbar ist."
+            "value" : "Maximaler Downstream und Upstream sind erforderlich. Beide Werte manuell eingeben, wenn die automatische Erkennung nicht verfügbar ist."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enter downstream and upstream limits manually if automatic detection is unavailable."
+            "value" : "Maximum downstream and upstream values are required. Enter both manually if automatic detection is unavailable."
           }
         }
       }
