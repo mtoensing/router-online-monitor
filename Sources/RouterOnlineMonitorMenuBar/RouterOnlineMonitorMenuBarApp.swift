@@ -436,7 +436,8 @@ struct MenuPopoverView: View {
                     Text(emptyStateTitle).font(.headline)
                     Text(emptyStateMessage).font(.caption).foregroundStyle(.secondary)
                 }
-                    .frame(height: 130)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 130)
             } else {
                 Chart(recentSamples) { sample in
                     LineMark(
