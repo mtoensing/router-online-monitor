@@ -39,6 +39,7 @@
 "picker.menuBarDisplay" = "Menu-bar display";
 "picker.menuBarDisplay.percentage" = "Percentage";
 "picker.menuBarDisplay.rate" = "Traffic rate";
+"picker.menuBarDisplay.rectangles" = "Rectangles (Default)";
 "picker.menuBarLabels" = "Menu-bar labels";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Default)";
 "picker.menuBarLabels.direction" = "In / Out";

@@ -39,6 +39,7 @@
 "picker.menuBarDisplay" = "Menüleisten-Anzeige";
 "picker.menuBarDisplay.percentage" = "Prozent";
 "picker.menuBarDisplay.rate" = "Verkehrsrate";
+"picker.menuBarDisplay.rectangles" = "Rechtecke (Standard)";
 "picker.menuBarLabels" = "Menüleisten-Beschriftungen";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Standard)";
 "picker.menuBarLabels.direction" = "Ein / Aus";

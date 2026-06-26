@@ -657,6 +657,22 @@
         }
       }
     },
+    "picker.menuBarDisplay.rectangles" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechtecke (Standard)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rectangles (Default)"
+          }
+        }
+      }
+    },
     "picker.menuBarLabels" : {
       "localizations" : {
         "de" : {

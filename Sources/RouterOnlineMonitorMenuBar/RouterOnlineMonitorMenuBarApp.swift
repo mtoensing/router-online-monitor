@@ -93,12 +93,20 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let sample = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
-        setMenuBarUsageBars(
-            sample: sample,
-            downCapacity: downCapacity,
-            upCapacity: upCapacity,
-            labels: menuBarLabels()
-        )
+        let labels = menuBarLabels()
+        switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
+        case "rate":
+            setMenuBarTitle(menuBarRateTitle(sample: sample, labels: labels))
+        case "percentage":
+            setMenuBarTitle(menuBarPercentageTitle(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity, labels: labels))
+        default:
+            setMenuBarUsageBars(
+                sample: sample,
+                downCapacity: downCapacity,
+                upCapacity: upCapacity,
+                labels: labels
+            )
+        }
         statusItem?.button?.toolTip = menuBarTooltip(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity)
     }
 
@@ -137,6 +145,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         case "direction": return (L10n.string("traffic.in"), L10n.string("traffic.out"))
         default: return ("D:", "U:")
         }
+    }
+
+    private func menuBarRateTitle(sample: TrafficSample, labels: (download: String, upload: String)) -> String {
+        "\(labels.download) \(TrafficFormatting.compactMbit(sample.downloadBitsPerSecond))  \(labels.upload) \(TrafficFormatting.compactMbit(sample.uploadBitsPerSecond))"
+    }
+
+    private func menuBarPercentageTitle(
+        sample: TrafficSample,
+        downCapacity: Double,
+        upCapacity: Double,
+        labels: (download: String, upload: String)
+    ) -> String {
+        let download = menuBarPercentage(sample.downloadBitsPerSecond, capacity: downCapacity)
+        let upload = menuBarPercentage(sample.uploadBitsPerSecond, capacity: upCapacity)
+        return "\(labels.download) \(download)  \(labels.upload) \(upload)"
+    }
+
+    private func menuBarPercentage(_ bitsPerSecond: Double, capacity: Double) -> String {
+        guard capacity > 0 else { return "--%" }
+        return String(format: "%.0f%%", usageFraction(bitsPerSecond, capacity: capacity) * 100)
     }
 
     private func setMenuBarTitle(_ title: String) {
@@ -537,6 +565,7 @@ struct SettingsView: View {
     let showsHiddenSettings: Bool
     @AppStorage("routerHost") private var host = "192.168.178.1"
     @AppStorage("routerUsername") private var username = ""
+    @AppStorage("menuBarDisplayStyle") private var menuBarDisplayStyle = "rectangles"
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
     @AppStorage("pollIntervalSeconds") private var pollIntervalSeconds = 5.0
@@ -578,6 +607,11 @@ struct SettingsView: View {
             }
 
             Section {
+                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
+                    Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
+                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
+                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
+                }
                 Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
                     Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
                     Text(L10n.string("picker.menuBarLabels.short")).tag("short")
@@ -641,7 +675,16 @@ struct SettingsView: View {
         .onChange(of: showOneDecimalMbit) { _ in
             monitor.refreshPresentation()
         }
+        .onChange(of: menuBarDisplayStyle) { _ in
+            monitor.refreshPresentation()
+        }
         .onChange(of: menuBarLabelStyle) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: downstreamCapacityMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: upstreamCapacityMbit) { _ in
             monitor.refreshPresentation()
         }
         .onChange(of: pollIntervalSeconds) { _ in
