@@ -52,6 +52,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var connectingSubscription: AnyCancellable?
     private var connectingAnimationTimer: Timer?
     private var connectingAnimationStep = 0
+    private var currentPopoverContentSize = CGSize.zero
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
@@ -67,7 +68,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             let monitor = TrafficMonitor.shared
             popover.behavior = .transient
-            popover.contentViewController = NSHostingController(rootView: MenuPopoverView(monitor: monitor))
+            popover.contentViewController = NSHostingController(
+                rootView: MenuPopoverView(monitor: monitor) { [weak self] size in
+                    self?.updatePopoverContentSize(size)
+                }
+            )
             item.button?.target = self
             item.button?.action = #selector(togglePopover)
             samplesSubscription = monitor.$samples.sink { [weak self] _ in self?.updateMenuBar() }
@@ -421,6 +426,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         frame.origin.x = min(max(frame.origin.x, minimumX), maximumX)
         window.setFrame(frame, display: true)
     }
+
+    private func updatePopoverContentSize(_ size: CGSize) {
+        let contentSize = CGSize(width: ceil(size.width), height: ceil(size.height))
+        guard contentSize.width > 0, contentSize.height > 0,
+              abs(contentSize.width - currentPopoverContentSize.width) > 0.5 ||
+              abs(contentSize.height - currentPopoverContentSize.height) > 0.5 else { return }
+        currentPopoverContentSize = contentSize
+        popover.contentSize = contentSize
+        if let button = statusItem?.button, popover.isShown {
+            constrainPopover(to: button)
+        }
+    }
 }
 
 enum TrafficFormatting {
@@ -449,6 +466,7 @@ private enum PopoverLayout {
 
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
+    let onContentSizeChange: (CGSize) -> Void
     @AppStorage("configPanelIsExpanded") private var isConfigPanelExpanded = true
     @AppStorage("configPanelUserPreferenceSet") private var configPanelUserPreferenceSet = false
     @State private var showsHiddenSettings = false
@@ -465,8 +483,9 @@ struct MenuPopoverView: View {
         }
         .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
-        .frame(maxHeight: maximumPopoverHeight)
+        .frame(minHeight: minimumPopoverHeight, maxHeight: maximumPopoverHeight)
         .background(Color(nsColor: .windowBackgroundColor))
+        .reportSize(onContentSizeChange)
         .onAppear {
             applyDefaultConfigPanelState()
         }
@@ -477,11 +496,15 @@ struct MenuPopoverView: View {
 
     private var maximumPopoverHeight: CGFloat {
         let visibleHeight = NSScreen.main?.visibleFrame.height ?? 760
-        return max(560, visibleHeight - PopoverLayout.maximumScreenMargin)
+        return max(420, visibleHeight - PopoverLayout.maximumScreenMargin)
+    }
+
+    private var minimumPopoverHeight: CGFloat? {
+        isConfigPanelExpanded ? min(720, maximumPopoverHeight) : nil
     }
 
     private var maximumSettingsHeight: CGFloat {
-        max(220, maximumPopoverHeight - 430)
+        max(240, (minimumPopoverHeight ?? maximumPopoverHeight) - 430)
     }
 
     private var header: some View {
@@ -621,7 +644,7 @@ struct MenuPopoverView: View {
                     .padding(.bottom, PopoverLayout.cardPadding)
                 }
                 .scrollIndicators(.automatic)
-                .frame(maxHeight: maximumSettingsHeight)
+                .frame(height: maximumSettingsHeight)
             }
         }
         .popoverCard()
@@ -773,9 +796,26 @@ private struct PopoverCardModifier: ViewModifier {
     }
 }
 
+private struct ViewSizePreferenceKey: PreferenceKey {
+    static var defaultValue = CGSize.zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 private extension View {
     func popoverCard() -> some View {
         modifier(PopoverCardModifier())
+    }
+
+    func reportSize(_ onChange: @escaping (CGSize) -> Void) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: ViewSizePreferenceKey.self, value: proxy.size)
+            }
+        }
+        .onPreferenceChange(ViewSizePreferenceKey.self, perform: onChange)
     }
 }
 
