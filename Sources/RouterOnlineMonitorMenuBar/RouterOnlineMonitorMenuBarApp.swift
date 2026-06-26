@@ -439,6 +439,13 @@ enum TrafficFormatting {
     }
 }
 
+private enum PopoverLayout {
+    static let outerPadding: CGFloat = 16
+    static let cardSpacing: CGFloat = 12
+    static let cardPadding: CGFloat = 14
+    static let formHorizontalPadding: CGFloat = 28
+}
+
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
     @AppStorage("configPanelIsExpanded") private var isConfigPanelExpanded = true
@@ -448,14 +455,14 @@ struct MenuPopoverView: View {
     @State private var lastVersionClickAt: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: PopoverLayout.cardSpacing) {
             header
             monitoringCard
             configCard
             footer
             actionBar
         }
-        .padding(16)
+        .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
@@ -547,7 +554,7 @@ struct MenuPopoverView: View {
                 }
             }
         }
-        .padding(12)
+        .padding(PopoverLayout.cardPadding)
         .popoverCard()
     }
 
@@ -574,8 +581,8 @@ struct MenuPopoverView: View {
                         .foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.horizontal, PopoverLayout.cardPadding)
+                .padding(.vertical, PopoverLayout.cardPadding)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.string("section.config"))
@@ -583,7 +590,7 @@ struct MenuPopoverView: View {
 
             if isConfigPanelExpanded {
                 Divider()
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, PopoverLayout.cardPadding)
 
                 SettingsView(
                     monitor: monitor,
@@ -592,9 +599,9 @@ struct MenuPopoverView: View {
                         isConfigPanelExpanded = false
                     }
                 )
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
+                .padding(.horizontal, PopoverLayout.formHorizontalPadding)
+                .padding(.top, PopoverLayout.cardPadding)
+                .padding(.bottom, PopoverLayout.cardPadding)
             }
         }
         .popoverCard()
