@@ -94,7 +94,7 @@ Note: automatic line-rate detection uses the DSL-specific `WANDSLInterfaceConfig
 
 ## Data model
 
-- Sample interval: 5 seconds by default; configurable in the hidden polling settings.
+- Sample interval: 5 seconds by default.
 - Retention: 12 hours.
 - Data source: FRITZ!Box TR-064 `WANCommonInterfaceConfig` byte counters.
 - Scope: whole-router Internet traffic, not individual devices.
