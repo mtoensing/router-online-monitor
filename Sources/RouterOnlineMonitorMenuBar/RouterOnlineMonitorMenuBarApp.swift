@@ -444,12 +444,13 @@ private enum PopoverLayout {
     static let cardSpacing: CGFloat = 12
     static let cardPadding: CGFloat = 14
     static let formHorizontalPadding: CGFloat = 28
+    static let maximumScreenMargin: CGFloat = 48
 }
 
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
     @AppStorage("configPanelIsExpanded") private var isConfigPanelExpanded = true
-    @AppStorage("configPanelPreferenceInitialized") private var configPanelPreferenceInitialized = false
+    @AppStorage("configPanelUserPreferenceSet") private var configPanelUserPreferenceSet = false
     @State private var showsHiddenSettings = false
     @State private var versionClickCount = 0
     @State private var lastVersionClickAt: Date?
@@ -457,17 +458,33 @@ struct MenuPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PopoverLayout.cardSpacing) {
             header
-            monitoringCard
-            configCard
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: PopoverLayout.cardSpacing) {
+                    monitoringCard
+                    configCard
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollIndicators(.automatic)
+            .layoutPriority(1)
             footer
             actionBar
         }
         .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
+        .frame(maxHeight: maximumPopoverHeight)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
-            initializeConfigPanelState()
+            applyDefaultConfigPanelState()
         }
+        .onChange(of: monitor.isConnected) { _ in
+            applyDefaultConfigPanelState()
+        }
+    }
+
+    private var maximumPopoverHeight: CGFloat {
+        let visibleHeight = NSScreen.main?.visibleFrame.height ?? 760
+        return max(560, visibleHeight - PopoverLayout.maximumScreenMargin)
     }
 
     private var header: some View {
@@ -562,6 +579,7 @@ struct MenuPopoverView: View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: 0.16)) {
+                    configPanelUserPreferenceSet = true
                     isConfigPanelExpanded.toggle()
                 }
             } label: {
@@ -596,7 +614,8 @@ struct MenuPopoverView: View {
                     monitor: monitor,
                     showsHiddenSettings: showsHiddenSettings,
                     onSaved: {
-                        isConfigPanelExpanded = false
+                        configPanelUserPreferenceSet = false
+                        applyDefaultConfigPanelState()
                     }
                 )
                 .padding(.horizontal, PopoverLayout.formHorizontalPadding)
@@ -692,10 +711,9 @@ struct MenuPopoverView: View {
             .map(TrafficRateLimiter.cappedToConfiguredCapacities)
     }
 
-    private func initializeConfigPanelState() {
-        guard !configPanelPreferenceInitialized else { return }
-        isConfigPanelExpanded = RouterClient.fromPreferences() == nil
-        configPanelPreferenceInitialized = true
+    private func applyDefaultConfigPanelState() {
+        guard !configPanelUserPreferenceSet else { return }
+        isConfigPanelExpanded = RouterClient.fromPreferences() == nil || !monitor.isConnected
     }
 
     private func registerVersionClick() {
@@ -761,6 +779,12 @@ private extension View {
 }
 
 struct SettingsView: View {
+    private enum SettingsTab: String, Hashable {
+        case router
+        case lineSpeed
+        case menuBar
+    }
+
     @ObservedObject var monitor: TrafficMonitor
     let showsHiddenSettings: Bool
     let onSaved: () -> Void
@@ -779,9 +803,59 @@ struct SettingsView: View {
     @State private var isDiscovering = false
     @State private var discoveryStatus: String?
     @State private var showsCapacityHelp = false
+    @State private var selectedSettingsTab = SettingsTab.router
 
     var body: some View {
         Form {
+            Picker("", selection: $selectedSettingsTab) {
+                Text(L10n.string("settingsTab.router")).tag(SettingsTab.router)
+                Text(L10n.string("settingsTab.lineSpeed")).tag(SettingsTab.lineSpeed)
+                Text(L10n.string("settingsTab.menuBar")).tag(SettingsTab.menuBar)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            formSeparator
+
+            switch selectedSettingsTab {
+            case .router:
+                routerSettingsTab
+            case .lineSpeed:
+                lineSpeedSettingsTab
+            case .menuBar:
+                menuBarSettingsTab
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
+        .onAppear {
+            password = Keychain.password() ?? ""
+            detectLineRates()
+        }
+        .onChange(of: showOneDecimalMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: menuBarDisplayStyle) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: menuBarLabelStyle) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: downstreamCapacityMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: upstreamCapacityMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: pollIntervalSeconds) { _ in
+            normalizePollingInterval()
+            monitor.updatePollingInterval()
+        }
+    }
+
+    @ViewBuilder
+    private var routerSettingsTab: some View {
+        Group {
             Section {
                 HStack {
                     TextField(L10n.string("field.routerHost"), text: $host)
@@ -810,6 +884,32 @@ struct SettingsView: View {
 
             formSeparator
 
+            Section {
+                HStack {
+                    if saved {
+                        Label(L10n.string("status.savedToKeychain"), systemImage: "checkmark.circle")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Button(L10n.string("button.saveAndConnect")) {
+                        Keychain.save(password: password)
+                        saved = true
+                        monitor.reconfigure()
+                        detectLineRates()
+                        if RouterClient.fromPreferences() != nil {
+                            onSaved()
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var lineSpeedSettingsTab: some View {
+        Group {
             Section {
                 Button {
                     withAnimation(.easeInOut(duration: 0.16)) {
@@ -859,9 +959,12 @@ struct SettingsView: View {
             } header: {
                 Text(L10n.string("section.capacityLimits"))
             }
+        }
+    }
 
-            formSeparator
-
+    @ViewBuilder
+    private var menuBarSettingsTab: some View {
+        Group {
             Section {
                 Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
                     Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
@@ -900,54 +1003,6 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            formSeparator
-
-            Section {
-                HStack {
-                    if saved {
-                        Label(L10n.string("status.savedToKeychain"), systemImage: "checkmark.circle")
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Button(L10n.string("button.saveAndConnect")) {
-                        Keychain.save(password: password)
-                        saved = true
-                        monitor.reconfigure()
-                        detectLineRates()
-                        if RouterClient.fromPreferences() != nil {
-                            onSaved()
-                        }
-                    }
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 2)
-        .onAppear {
-            password = Keychain.password() ?? ""
-            detectLineRates()
-        }
-        .onChange(of: showOneDecimalMbit) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: menuBarDisplayStyle) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: menuBarLabelStyle) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: downstreamCapacityMbit) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: upstreamCapacityMbit) { _ in
-            monitor.refreshPresentation()
-        }
-        .onChange(of: pollIntervalSeconds) { _ in
-            normalizePollingInterval()
-            monitor.updatePollingInterval()
         }
     }
 

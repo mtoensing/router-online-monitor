@@ -71,6 +71,9 @@
 "section.hiddenSettings" = "Versteckte Einstellungen";
 "section.menuBar" = "Menüleiste";
 "section.routerConnection" = "Router-Verbindung";
+"settingsTab.lineSpeed" = "Leitung";
+"settingsTab.menuBar" = "Menüleiste";
+"settingsTab.router" = "Router";
 "status.connectedWaitingForSecondSample" = "Verbunden. Warten auf zweite Messung …";
 "status.connecting" = "Verbinden";
 "status.enterCredentials" = "Router-Zugangsdaten unten eingeben";

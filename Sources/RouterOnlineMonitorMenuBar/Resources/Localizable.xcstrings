@@ -1169,6 +1169,54 @@
         }
       }
     },
+    "settingsTab.lineSpeed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leitung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line Speed"
+          }
+        }
+      }
+    },
+    "settingsTab.menuBar" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menüleiste"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menu Bar"
+          }
+        }
+      }
+    },
+    "settingsTab.router" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Router"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Router"
+          }
+        }
+      }
+    },
     "status.connectedWaitingForSecondSample" : {
       "localizations" : {
         "de" : {

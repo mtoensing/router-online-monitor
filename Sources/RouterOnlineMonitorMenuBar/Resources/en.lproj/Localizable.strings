@@ -71,6 +71,9 @@
 "section.hiddenSettings" = "Hidden settings";
 "section.menuBar" = "Menu bar";
 "section.routerConnection" = "Router connection";
+"settingsTab.lineSpeed" = "Line Speed";
+"settingsTab.menuBar" = "Menu Bar";
+"settingsTab.router" = "Router";
 "status.connectedWaitingForSecondSample" = "Connected. Waiting for second sample…";
 "status.connecting" = "Connecting";
 "status.enterCredentials" = "Enter router credentials below";
