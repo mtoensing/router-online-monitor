@@ -482,7 +482,7 @@ struct MenuPopoverView: View {
         }
         .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
-        .frame(height: targetPopoverHeight)
+        .frame(height: targetPopoverHeight, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             applyDefaultConfigPanelState()
@@ -507,7 +507,7 @@ struct MenuPopoverView: View {
     }
 
     private var collapsedPopoverHeight: CGFloat {
-        min(540, maximumPopoverHeight)
+        min(440, maximumPopoverHeight)
     }
 
     private var expandedPopoverHeight: CGFloat {
