@@ -21,6 +21,7 @@ TR-064 is available on the local network. Reading protected data or changing rou
 ## macOS app design
 
 - Follow Apple’s Human Interface Guidelines for macOS. Use native SwiftUI/AppKit controls, system typography and system colors rather than custom imitations.
+- Prefer native SwiftUI/AppKit solutions first, and reuse the existing code and local patterns as much as possible before introducing custom layout, controls, or new abstractions.
 - Prefer clear hierarchy, familiar macOS menu-bar and settings patterns, and concise action labels.
 - Windows must adapt to their content: provide adequate content margins and minimum sizes, allow text to wrap where appropriate, and verify that no label, control, or helper text is clipped at the supported window sizes.
 - Keep configuration in a standard `Form` with meaningful sections and only show controls that are relevant to the selected mode.

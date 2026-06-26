@@ -412,7 +412,7 @@ struct MenuPopoverView: View {
     @State private var lastVersionClickAt: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(L10n.string("app.name")).font(.headline)
                 Spacer()
@@ -469,9 +469,9 @@ struct MenuPopoverView: View {
                 .font(.headline)
             }
 
-            Divider()
+            Divider().padding(.top, 2)
             SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
-            Divider()
+            Divider().padding(.top, 2)
             HStack {
                 Text(L10n.string("disclaimer.short"))
                 Spacer()
@@ -489,8 +489,9 @@ struct MenuPopoverView: View {
                 Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
             }
         }
-        .padding()
-        .frame(width: 560)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .frame(width: 660)
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
