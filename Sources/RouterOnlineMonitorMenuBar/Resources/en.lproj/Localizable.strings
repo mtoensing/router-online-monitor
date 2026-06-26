@@ -27,7 +27,12 @@
 "field.routerHost" = "Router host";
 "field.upstreamCapacity" = "Upstream (Mbit/s)";
 "field.username" = "Username";
+"help.capacityLimits" = "Required for rectangles and percentage display. If the router line rate cannot be detected, enter the downstream and upstream limits manually.";
+"help.menuBarDisplay.percentage" = "Shows current traffic as percentages of the capacity limits below.";
+"help.menuBarDisplay.rate" = "Shows current traffic as values. Decimal precision applies only to this value display.";
+"help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the capacity limits below.";
 "help.pollingInterval" = "Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.";
+"help.showOneDecimalPlace" = "Applies to the traffic-rate value display in the menu bar.";
 "lineRate.currentAndMax" = "%@ Mbit/s (max %@)";
 "lineRate.detectedDownstream" = "Detected downstream";
 "lineRate.detectedUpstream" = "Detected upstream";
@@ -51,6 +56,7 @@
 "routerDiscovery.searching" = "Searching the local network…";
 "section.capacityLimits" = "Capacity limits";
 "section.hiddenSettings" = "Hidden settings";
+"section.menuBar" = "Menu bar";
 "section.routerConnection" = "Router connection";
 "status.connectedWaitingForSecondSample" = "Connected. Waiting for second sample…";
 "status.connecting" = "Connecting";
@@ -72,3 +78,4 @@
 "traffic.out" = "Out";
 "traffic.upload" = "Upload";
 "traffic.uploadWithValue" = "Upload %@";
+"warning.capacityLimitsRequired" = "Enter downstream and upstream limits manually if automatic detection is unavailable.";

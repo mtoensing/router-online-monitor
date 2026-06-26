@@ -465,6 +465,70 @@
         }
       }
     },
+    "help.capacityLimits" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erforderlich für Rechtecke und Prozentanzeige. Wenn die Router-Leitungsrate nicht erkannt werden kann, Downstream- und Upstream-Grenzen manuell eingeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required for rectangles and percentage display. If the router line rate cannot be detected, enter the downstream and upstream limits manually."
+          }
+        }
+      }
+    },
+    "help.menuBarDisplay.percentage" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt den aktuellen Verkehr als Prozentwerte der Kapazitätsgrenzen unten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows current traffic as percentages of the capacity limits below."
+          }
+        }
+      }
+    },
+    "help.menuBarDisplay.rate" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt den aktuellen Verkehr als Werte. Die Dezimalgenauigkeit gilt nur für diese Werteanzeige."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows current traffic as values. Decimal precision applies only to this value display."
+          }
+        }
+      }
+    },
+    "help.menuBarDisplay.rectangles" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt kompakte Nutzungsrechtecke anhand der Kapazitätsgrenzen unten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows compact usage rectangles based on the capacity limits below."
+          }
+        }
+      }
+    },
     "help.pollingInterval" : {
       "localizations" : {
         "de" : {
@@ -477,6 +541,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts."
+          }
+        }
+      }
+    },
+    "help.showOneDecimalPlace" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gilt für die Verkehrsrate als Werteanzeige in der Menüleiste."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to the traffic-rate value display in the menu bar."
           }
         }
       }
@@ -849,6 +929,22 @@
         }
       }
     },
+    "section.menuBar" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menüleiste"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menu bar"
+          }
+        }
+      }
+    },
     "section.routerConnection" : {
       "localizations" : {
         "de" : {
@@ -1181,6 +1277,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Upload %@"
+          }
+        }
+      }
+    },
+    "warning.capacityLimitsRequired" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downstream- und Upstream-Grenzen manuell eingeben, wenn die automatische Erkennung nicht verfügbar ist."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter downstream and upstream limits manually if automatic detection is unavailable."
           }
         }
       }

@@ -27,7 +27,12 @@
 "field.routerHost" = "Router-Host";
 "field.upstreamCapacity" = "Upstream (Mbit/s)";
 "field.username" = "Benutzername";
+"help.capacityLimits" = "Erforderlich für Rechtecke und Prozentanzeige. Wenn die Router-Leitungsrate nicht erkannt werden kann, Downstream- und Upstream-Grenzen manuell eingeben.";
+"help.menuBarDisplay.percentage" = "Zeigt den aktuellen Verkehr als Prozentwerte der Kapazitätsgrenzen unten.";
+"help.menuBarDisplay.rate" = "Zeigt den aktuellen Verkehr als Werte. Die Dezimalgenauigkeit gilt nur für diese Werteanzeige.";
+"help.menuBarDisplay.rectangles" = "Zeigt kompakte Nutzungsrechtecke anhand der Kapazitätsgrenzen unten.";
 "help.pollingInterval" = "Mindestens 1 Sekunde. Werte unter 5 Sekunden können unruhiger wirken, weil manche Router Verkehrszähler in Bursts aktualisieren.";
+"help.showOneDecimalPlace" = "Gilt für die Verkehrsrate als Werteanzeige in der Menüleiste.";
 "lineRate.currentAndMax" = "%@ Mbit/s (max. %@)";
 "lineRate.detectedDownstream" = "Erkannter Downstream";
 "lineRate.detectedUpstream" = "Erkannter Upstream";
@@ -51,6 +56,7 @@
 "routerDiscovery.searching" = "Lokales Netzwerk wird durchsucht …";
 "section.capacityLimits" = "Kapazitätsgrenzen";
 "section.hiddenSettings" = "Versteckte Einstellungen";
+"section.menuBar" = "Menüleiste";
 "section.routerConnection" = "Router-Verbindung";
 "status.connectedWaitingForSecondSample" = "Verbunden. Warten auf zweite Messung …";
 "status.connecting" = "Verbinden";
@@ -72,3 +78,4 @@
 "traffic.out" = "Aus";
 "traffic.upload" = "Upload";
 "traffic.uploadWithValue" = "Upload %@";
+"warning.capacityLimitsRequired" = "Downstream- und Upstream-Grenzen manuell eingeben, wenn die automatische Erkennung nicht verfügbar ist.";

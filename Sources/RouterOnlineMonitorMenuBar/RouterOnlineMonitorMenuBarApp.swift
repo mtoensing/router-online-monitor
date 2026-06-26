@@ -612,6 +612,13 @@ struct SettingsView: View {
                     Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
                     Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
                 }
+                if menuBarDisplayStyle == "rate" {
+                    Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
+                    Text(L10n.string("help.showOneDecimalPlace"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
                     Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
                     Text(L10n.string("picker.menuBarLabels.short")).tag("short")
@@ -619,10 +626,24 @@ struct SettingsView: View {
                     Text(L10n.string("picker.menuBarLabels.network")).tag("network")
                     Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
                 }
-                Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
+            } header: {
+                Text(L10n.string("section.menuBar"))
+            } footer: {
+                Text(menuBarDisplayHelp)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Section(L10n.string("section.capacityLimits")) {
+            Section {
+                Text(L10n.string("help.capacityLimits"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if needsCapacityValues {
+                    Label(L10n.string("warning.capacityLimitsRequired"), systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(Color(nsColor: .systemOrange))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 TextField(L10n.string("field.downstreamCapacity"), value: $downstreamCapacityMbit, format: .number)
                 TextField(L10n.string("field.upstreamCapacity"), value: $upstreamCapacityMbit, format: .number)
                 if let rates = detectedLineRates {
@@ -641,6 +662,8 @@ struct SettingsView: View {
                 } else {
                     Text(L10n.string("lineRate.reading")).font(.caption).foregroundStyle(.secondary)
                 }
+            } header: {
+                Text(L10n.string("section.capacityLimits"))
             }
 
             if showsHiddenSettings {
@@ -731,6 +754,21 @@ struct SettingsView: View {
         if pollIntervalSeconds < 1 {
             pollIntervalSeconds = 1
         }
+    }
+
+    private var menuBarDisplayHelp: String {
+        switch menuBarDisplayStyle {
+        case "rate":
+            return L10n.string("help.menuBarDisplay.rate")
+        case "percentage":
+            return L10n.string("help.menuBarDisplay.percentage")
+        default:
+            return L10n.string("help.menuBarDisplay.rectangles")
+        }
+    }
+
+    private var needsCapacityValues: Bool {
+        downstreamCapacityMbit <= 0 || upstreamCapacityMbit <= 0
     }
 
     private var connectionColor: Color {
