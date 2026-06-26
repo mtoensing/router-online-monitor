@@ -845,25 +845,21 @@ struct SettingsView: View {
     @State private var selectedSettingsTab = SettingsTab.router
 
     var body: some View {
-        Form {
-            Picker("", selection: $selectedSettingsTab) {
-                Text(L10n.string("settingsTab.router")).tag(SettingsTab.router)
-                Text(L10n.string("settingsTab.lineSpeed")).tag(SettingsTab.lineSpeed)
-                Text(L10n.string("settingsTab.menuBar")).tag(SettingsTab.menuBar)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+        VStack(alignment: .center, spacing: 12) {
+            settingsTabPicker
+                .frame(width: 360)
 
-            formSeparator
-
-            switch selectedSettingsTab {
-            case .router:
-                routerSettingsTab
-            case .lineSpeed:
-                lineSpeedSettingsTab
-            case .menuBar:
-                menuBarSettingsTab
+            Form {
+                switch selectedSettingsTab {
+                case .router:
+                    routerSettingsTab
+                case .lineSpeed:
+                    lineSpeedSettingsTab
+                case .menuBar:
+                    menuBarSettingsTab
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 2)
@@ -890,6 +886,16 @@ struct SettingsView: View {
             normalizePollingInterval()
             monitor.updatePollingInterval()
         }
+    }
+
+    private var settingsTabPicker: some View {
+        Picker("", selection: $selectedSettingsTab) {
+            Text(L10n.string("settingsTab.router")).tag(SettingsTab.router)
+            Text(L10n.string("settingsTab.lineSpeed")).tag(SettingsTab.lineSpeed)
+            Text(L10n.string("settingsTab.menuBar")).tag(SettingsTab.menuBar)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     @ViewBuilder
