@@ -655,7 +655,7 @@ struct MenuPopoverView: View {
             Text(L10n.string("disclaimer.short"))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 12)
-            Text(L10n.format("app.version", "1.0.32"))
+            Text(L10n.format("app.version", "1.0.33"))
                 .lineLimit(1)
                 .onTapGesture {
                     registerVersionClick()
