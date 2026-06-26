@@ -16,6 +16,10 @@ on:
         description: Optional explicit semantic version, for example 1.2.3. Overrides bump.
         required: false
         type: string
+      release_notes:
+        description: Optional release notes to place above the generated GitHub notes.
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -184,6 +188,8 @@ jobs:
           target_commitish: main
           files: Router-Online-Monitor-macOS.zip
           body: |
+            ${{ inputs.release_notes }}
+
             ## macOS Gatekeeper note
 
             This open-source release is ad-hoc signed but not Apple-notarized. macOS may block the first launch with “Apple could not verify this app is free of malware.”

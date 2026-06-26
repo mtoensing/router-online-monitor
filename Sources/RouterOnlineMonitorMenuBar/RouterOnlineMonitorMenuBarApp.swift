@@ -54,6 +54,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var connectingAnimationStep = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMainMenu()
+
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             button.image = Self.menuBarArrowsImage()
@@ -74,6 +76,36 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             connectingSubscription = monitor.$isConnecting.sink { [weak self] _ in self?.updateMenuBar() }
             updateMenuBar()
         }
+    }
+
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(
+            title: L10n.string("button.quit"),
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ))
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: L10n.string("menu.edit"))
+        editMenu.addItem(NSMenuItem(title: L10n.string("menu.undo"), action: Selector(("undo:")), keyEquivalent: "z"))
+        let redo = NSMenuItem(title: L10n.string("menu.redo"), action: Selector(("redo:")), keyEquivalent: "Z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redo)
+        editMenu.addItem(.separator())
+        editMenu.addItem(NSMenuItem(title: L10n.string("menu.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: L10n.string("menu.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: L10n.string("menu.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: L10n.string("menu.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func updateMenuBar() {
@@ -368,7 +400,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
             Task { @MainActor [weak self, weak button] in
                 guard let self, let button else { return }
                 self.constrainPopover(to: button)
@@ -407,37 +441,70 @@ enum TrafficFormatting {
 
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
+    @AppStorage("configPanelIsExpanded") private var isConfigPanelExpanded = true
+    @AppStorage("configPanelPreferenceInitialized") private var configPanelPreferenceInitialized = false
     @State private var showsHiddenSettings = false
     @State private var versionClickCount = 0
     @State private var lastVersionClickAt: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(L10n.string("app.name")).font(.headline)
-                Spacer()
-                if monitor.isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            monitoringCard
+            configCard
+            footer
+            actionBar
+        }
+        .padding(16)
+        .frame(width: 540)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            initializeConfigPanelState()
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "network")
+                .font(.system(size: 15, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L10n.string("app.name"))
+                    .font(.headline)
                 Text(headerStatusLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
+            Spacer()
+            if monitor.isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
 
+    private var monitoringCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             if recentSamples.isEmpty {
-                VStack(spacing: 6) {
+                VStack(spacing: 8) {
                     if monitor.isRefreshing {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Image(systemName: emptyStateSystemImage).font(.title2)
+                        Image(systemName: emptyStateSystemImage)
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
                     }
                     Text(emptyStateTitle).font(.headline)
-                    Text(emptyStateMessage).font(.caption).foregroundStyle(.secondary)
+                    Text(emptyStateMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, minHeight: 130)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 150)
             } else {
                 Chart(recentSamples) { sample in
                     LineMark(
@@ -458,42 +525,86 @@ struct MenuPopoverView: View {
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
                 .chartYAxisLabel("Mbit/s")
-                .frame(height: 150)
+                .frame(height: 170)
             }
 
             if let latestSample = monitor.samples.last {
+                Divider()
                 let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
-                HStack(spacing: 16) {
-                    Label(L10n.format("traffic.downloadWithValue", formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit")), systemImage: "arrow.down").foregroundStyle(.blue)
-                    Label(L10n.format("traffic.uploadWithValue", formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit")), systemImage: "arrow.up").foregroundStyle(Color(nsColor: .systemPink))
+                HStack(spacing: 12) {
+                    TrafficMetricView(
+                        title: L10n.string("traffic.download"),
+                        value: formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"),
+                        systemImage: "arrow.down",
+                        color: .blue
+                    )
+                    TrafficMetricView(
+                        title: L10n.string("traffic.upload"),
+                        value: formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"),
+                        systemImage: "arrow.up",
+                        color: Color(nsColor: .systemPink)
+                    )
                 }
-                .font(.headline)
-                .padding(.bottom, 6)
-            }
-
-            Divider().padding(.vertical, 4)
-            SettingsView(monitor: monitor, showsHiddenSettings: showsHiddenSettings)
-            Divider().padding(.vertical, 4)
-            HStack {
-                Text(L10n.string("disclaimer.short"))
-                Spacer()
-                Text(L10n.format("app.version", "1.0.26"))
-                    .onTapGesture {
-                        registerVersionClick()
-                    }
-            }
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            HStack {
-                Button(L10n.string("button.refreshNow")) { monitor.poll() }
-                    .disabled(monitor.isRefreshing)
-                Spacer()
-                Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .frame(width: 660)
+        .padding(12)
+        .popoverCard()
+    }
+
+    private var configCard: some View {
+        DisclosureGroup(isExpanded: $isConfigPanelExpanded) {
+            SettingsView(
+                monitor: monitor,
+                showsHiddenSettings: showsHiddenSettings,
+                onSaved: {
+                    isConfigPanelExpanded = false
+                }
+            )
+            .padding(.top, 10)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(.secondary)
+                Text(L10n.string("section.config"))
+                    .font(.headline)
+                Spacer()
+                Text(configSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .popoverCard()
+    }
+
+    private var footer: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(L10n.string("disclaimer.short"))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 12)
+            Text(L10n.format("app.version", "1.0.26"))
+                .lineLimit(1)
+                .onTapGesture {
+                    registerVersionClick()
+                }
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 4)
+    }
+
+    private var actionBar: some View {
+        HStack {
+            Button {
+                monitor.poll()
+            } label: {
+                Label(L10n.string("button.refreshNow"), systemImage: "arrow.clockwise")
+            }
+            .disabled(monitor.isRefreshing)
+            Spacer()
+            Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
+        }
+        .padding(.horizontal, 4)
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
@@ -540,11 +651,21 @@ struct MenuPopoverView: View {
         monitor.status == L10n.string("status.enterCredentials")
     }
 
+    private var configSummary: String {
+        isSetupRequired ? L10n.string("config.summary.setupRequired") : L10n.string("config.summary.configured")
+    }
+
     private var recentSamples: [TrafficSample] {
         let cutoff = Date().addingTimeInterval(-30 * 60)
         return monitor.samples
             .filter { $0.recordedAt >= cutoff }
             .map(TrafficRateLimiter.cappedToConfiguredCapacities)
+    }
+
+    private func initializeConfigPanelState() {
+        guard !configPanelPreferenceInitialized else { return }
+        isConfigPanelExpanded = RouterClient.fromPreferences() == nil
+        configPanelPreferenceInitialized = true
     }
 
     private func registerVersionClick() {
@@ -563,9 +684,56 @@ struct MenuPopoverView: View {
     }
 }
 
+private struct TrafficMetricView: View {
+    let title: String
+    let value: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.headline.monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.headline)
+        }
+        .foregroundStyle(color)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PopoverCardModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.65), lineWidth: 1)
+            }
+    }
+}
+
+private extension View {
+    func popoverCard() -> some View {
+        modifier(PopoverCardModifier())
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var monitor: TrafficMonitor
     let showsHiddenSettings: Bool
+    let onSaved: () -> Void
     @AppStorage("routerHost") private var host = "192.168.178.1"
     @AppStorage("routerUsername") private var username = ""
     @AppStorage("menuBarDisplayStyle") private var menuBarDisplayStyle = "rectangles"
@@ -700,6 +868,9 @@ struct SettingsView: View {
                         saved = true
                         monitor.reconfigure()
                         detectLineRates()
+                        if RouterClient.fromPreferences() != nil {
+                            onSaved()
+                        }
                     }
                     .keyboardShortcut(.defaultAction)
                 }

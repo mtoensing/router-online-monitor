@@ -7,6 +7,8 @@
 "button.useRouterLineRate" = "Use Detected Line Speed";
 "chart.axis.time" = "Time";
 "chart.series.direction" = "Direction";
+"config.summary.configured" = "Configured";
+"config.summary.setupRequired" = "Setup required";
 "connection.connected" = "Connected";
 "connection.connecting" = "Connecting";
 "connection.disconnected" = "Disconnected";
@@ -41,6 +43,13 @@
 "menubar.tooltip.percentage" = "Current router traffic as a percentage of the configured line speed";
 "menubar.tooltip.rate" = "Current router download and upload rate";
 "menubar.tooltip.waitingForFirstSample" = "Router Online Monitor: waiting for first sample";
+"menu.copy" = "Copy";
+"menu.cut" = "Cut";
+"menu.edit" = "Edit";
+"menu.paste" = "Paste";
+"menu.redo" = "Redo";
+"menu.selectAll" = "Select All";
+"menu.undo" = "Undo";
 "picker.menuBarDisplay" = "Menu-bar display";
 "picker.menuBarDisplay.percentage" = "Percentage";
 "picker.menuBarDisplay.rate" = "Traffic rate";
@@ -55,6 +64,7 @@
 "routerDiscovery.notFound" = "Could not find a compatible router on the local network.";
 "routerDiscovery.searching" = "Searching the local network…";
 "section.capacityLimits" = "Required line speed limits";
+"section.config" = "Config";
 "section.hiddenSettings" = "Hidden settings";
 "section.menuBar" = "Menu bar";
 "section.routerConnection" = "Router connection";

@@ -7,6 +7,8 @@
 "button.useRouterLineRate" = "Erkannte Leitungsgeschwindigkeit verwenden";
 "chart.axis.time" = "Zeit";
 "chart.series.direction" = "Richtung";
+"config.summary.configured" = "Konfiguriert";
+"config.summary.setupRequired" = "Einrichtung erforderlich";
 "connection.connected" = "Verbunden";
 "connection.connecting" = "Verbinden";
 "connection.disconnected" = "Getrennt";
@@ -41,6 +43,13 @@
 "menubar.tooltip.percentage" = "Aktueller Router-Verkehr als Prozentsatz der konfigurierten Leitungsgeschwindigkeit";
 "menubar.tooltip.rate" = "Aktuelle Download- und Upload-Rate des Routers";
 "menubar.tooltip.waitingForFirstSample" = "Router Online Monitor: wartet auf erste Messung";
+"menu.copy" = "Kopieren";
+"menu.cut" = "Ausschneiden";
+"menu.edit" = "Bearbeiten";
+"menu.paste" = "Einsetzen";
+"menu.redo" = "Wiederholen";
+"menu.selectAll" = "Alles auswählen";
+"menu.undo" = "Widerrufen";
 "picker.menuBarDisplay" = "Menüleisten-Anzeige";
 "picker.menuBarDisplay.percentage" = "Prozent";
 "picker.menuBarDisplay.rate" = "Verkehrsrate";
@@ -55,6 +64,7 @@
 "routerDiscovery.notFound" = "Kein kompatibler Router im lokalen Netzwerk gefunden.";
 "routerDiscovery.searching" = "Lokales Netzwerk wird durchsucht …";
 "section.capacityLimits" = "Erforderliche Leitungslimits";
+"section.config" = "Konfiguration";
 "section.hiddenSettings" = "Versteckte Einstellungen";
 "section.menuBar" = "Menüleiste";
 "section.routerConnection" = "Router-Verbindung";
