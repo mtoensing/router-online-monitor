@@ -1,10 +1,11 @@
 "app.name" = "Router Online Monitor";
 "app.version" = "Version %@";
 "button.findRouter" = "Router suchen";
-"button.moreInfo" = "Weitere Informationen";
+"button.hideLineSpeedHelp" = "Hilfe zu Leitungslimits ausblenden";
 "button.quit" = "Beenden";
 "button.refreshNow" = "Jetzt aktualisieren";
 "button.saveAndConnect" = "Speichern und verbinden";
+"button.showLineSpeedHelp" = "Über Leitungslimits";
 "button.useRouterLineRate" = "Erkannte Leitungsgeschwindigkeit verwenden";
 "chart.axis.time" = "Zeit";
 "chart.series.direction" = "Richtung";

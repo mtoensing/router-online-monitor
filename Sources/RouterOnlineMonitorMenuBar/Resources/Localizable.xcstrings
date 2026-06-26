@@ -49,18 +49,18 @@
         }
       }
     },
-    "button.moreInfo" : {
+    "button.hideLineSpeedHelp" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Weitere Informationen"
+            "value" : "Hilfe zu Leitungslimits ausblenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "More Information"
+            "value" : "Hide line speed help"
           }
         }
       }
@@ -109,6 +109,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Save and Connect"
+          }
+        }
+      }
+    },
+    "button.showLineSpeedHelp" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Über Leitungslimits"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About line speed limits"
           }
         }
       }

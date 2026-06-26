@@ -753,32 +753,6 @@ private extension View {
     }
 }
 
-private struct HelpPopoverButton: View {
-    let text: String
-    @State private var isPresented = false
-
-    var body: some View {
-        Button {
-            isPresented.toggle()
-        } label: {
-            Image(systemName: "info.circle")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .help(text)
-        .accessibilityLabel(L10n.string("button.moreInfo"))
-        .popover(isPresented: $isPresented) {
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(12)
-                .frame(width: 280, alignment: .leading)
-        }
-    }
-}
-
 struct SettingsView: View {
     @ObservedObject var monitor: TrafficMonitor
     let showsHiddenSettings: Bool
@@ -797,6 +771,7 @@ struct SettingsView: View {
     @State private var detectionError: String?
     @State private var isDiscovering = false
     @State private var discoveryStatus: String?
+    @State private var showsCapacityHelp = false
 
     var body: some View {
         Form {
@@ -829,6 +804,27 @@ struct SettingsView: View {
             formSeparator
 
             Section {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        showsCapacityHelp.toggle()
+                    }
+                } label: {
+                    Label(
+                        showsCapacityHelp ? L10n.string("button.hideLineSpeedHelp") : L10n.string("button.showLineSpeedHelp"),
+                        systemImage: showsCapacityHelp ? "info.circle.fill" : "info.circle"
+                    )
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if showsCapacityHelp {
+                    Text(L10n.string("help.capacityLimits"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if needsCapacityValues {
                     Label(L10n.string("warning.capacityLimitsRequired"), systemImage: "exclamationmark.triangle")
                         .font(.caption)
@@ -854,10 +850,7 @@ struct SettingsView: View {
                     Text(L10n.string("lineRate.reading")).font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
-                HStack(spacing: 5) {
-                    Text(L10n.string("section.capacityLimits"))
-                    HelpPopoverButton(text: L10n.string("help.capacityLimits"))
-                }
+                Text(L10n.string("section.capacityLimits"))
             }
 
             formSeparator
