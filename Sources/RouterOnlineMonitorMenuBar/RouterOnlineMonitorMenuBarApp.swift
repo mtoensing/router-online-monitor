@@ -132,6 +132,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
         let labels = menuBarLabels()
         switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
+        case "minimalist":
+            setMenuBarIcon(
+                isAlerting: isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity) ||
+                    isAtCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            )
         case "rate":
             setMenuBarRateTitle(
                 sample: sample,
@@ -178,15 +183,17 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.title = ""
         button.attributedTitle = NSAttributedString()
         button.image = image
+        button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
 
-    private func setMenuBarIcon() {
+    private func setMenuBarIcon(isAlerting: Bool = false) {
         guard let button = statusItem?.button else { return }
         statusItem?.length = NSStatusItem.squareLength
         button.title = ""
         button.attributedTitle = NSAttributedString()
         button.image = Self.menuBarArrowsImage()
+        button.contentTintColor = isAlerting ? .systemRed : nil
         button.imagePosition = .imageOnly
     }
 
@@ -299,6 +306,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
         statusItem?.length = NSStatusItem.variableLength
         button.image = nil
+        button.contentTintColor = nil
         button.imagePosition = .noImage
         button.attributedTitle = title
     }
@@ -462,6 +470,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func isNearCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
         capacity > 0 && bitsPerSecond >= capacity * 0.95
+    }
+
+    private func isAtCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
+        capacity > 0 && bitsPerSecond >= capacity
     }
 
     private func menuBarTooltip(sample: TrafficSample, downCapacity: Double, upCapacity: Double) -> String {
@@ -1104,6 +1116,7 @@ struct SettingsView: View {
             Section {
                 Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
                     Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
+                    Text(L10n.string("picker.menuBarDisplay.minimalist")).tag("minimalist")
                     Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
                     Text(L10n.string("picker.menuBarDisplay.stableText")).tag("stableText")
                     Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
@@ -1115,12 +1128,14 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
-                    Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
-                    Text(L10n.string("picker.menuBarLabels.short")).tag("short")
-                    Text(L10n.string("picker.menuBarLabels.words")).tag("words")
-                    Text(L10n.string("picker.menuBarLabels.network")).tag("network")
-                    Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
+                if menuBarDisplayStyle != "minimalist" {
+                    Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
+                        Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
+                        Text(L10n.string("picker.menuBarLabels.short")).tag("short")
+                        Text(L10n.string("picker.menuBarLabels.words")).tag("words")
+                        Text(L10n.string("picker.menuBarLabels.network")).tag("network")
+                        Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
+                    }
                 }
             } header: {
                 Text(L10n.string("section.menuBar"))
@@ -1190,6 +1205,8 @@ struct SettingsView: View {
 
     private var menuBarDisplayHelp: String {
         switch menuBarDisplayStyle {
+        case "minimalist":
+            return L10n.string("help.menuBarDisplay.minimalist")
         case "rate":
             return L10n.string("help.menuBarDisplay.rate")
         case "stableText":

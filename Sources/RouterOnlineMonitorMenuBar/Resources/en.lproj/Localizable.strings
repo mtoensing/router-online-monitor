@@ -32,6 +32,7 @@
 "field.upstreamCapacity" = "Max upstream (Mbit/s)";
 "field.username" = "Username";
 "help.capacityLimits" = "Required. Set the maximum downstream and upstream line speeds used for rectangles, percentages, and near-capacity warnings. If automatic detection is unavailable, enter both values manually.";
+"help.menuBarDisplay.minimalist" = "Shows only the app icon. The icon turns red when download or upload reaches the required line speed limit.";
 "help.menuBarDisplay.percentage" = "Shows current traffic as percentages of the required line speed limits.";
 "help.menuBarDisplay.rate" = "Shows current traffic as values. Decimal precision applies only to this value display.";
 "help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the required line speed limits.";
@@ -55,6 +56,7 @@
 "menu.selectAll" = "Select All";
 "menu.undo" = "Undo";
 "picker.menuBarDisplay" = "Menu-bar display";
+"picker.menuBarDisplay.minimalist" = "Minimalist";
 "picker.menuBarDisplay.percentage" = "Percentage";
 "picker.menuBarDisplay.rate" = "Traffic rate";
 "picker.menuBarDisplay.rectangles" = "Rectangles (Default)";
