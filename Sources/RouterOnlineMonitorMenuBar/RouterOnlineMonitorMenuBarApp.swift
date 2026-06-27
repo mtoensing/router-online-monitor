@@ -855,7 +855,7 @@ struct MenuPopoverView: View {
 
     private func applyDefaultConfigPanelState() {
         guard !configPanelUserPreferenceSet else { return }
-        isConfigPanelExpanded = RouterClient.fromPreferences() == nil || !monitor.isConnected
+        isConfigPanelExpanded = !RouterClient.hasPreferences || !monitor.isConnected
     }
 
     private func registerVersionClick() {
@@ -1045,7 +1045,7 @@ struct SettingsView: View {
                         saved = true
                         monitor.reconfigure()
                         detectLineRates()
-                        if RouterClient.fromPreferences() != nil {
+                        if RouterClient.hasPreferences {
                             onSaved()
                         }
                     }
@@ -1288,6 +1288,7 @@ final class TrafficMonitor: ObservableObject {
     private var timer: Timer?
     private var pollInFlight = false
     private var consecutivePollFailures = 0
+    private var client: RouterClient?
 
     init() {
         samples = storage.load()
@@ -1298,6 +1299,8 @@ final class TrafficMonitor: ObservableObject {
     }
 
     func reconfigure() {
+        client?.invalidate()
+        client = nil
         previous = nil
         preferencesVersion += 1
         poll()
@@ -1315,7 +1318,7 @@ final class TrafficMonitor: ObservableObject {
     func prepopulateLineCapacities() {
         let defaults = UserDefaults.standard
         guard defaults.double(forKey: "downstreamCapacityMbit") <= 0 || defaults.double(forKey: "upstreamCapacityMbit") <= 0,
-              let client = RouterClient.fromPreferences() else { return }
+              let client = configuredClient() else { return }
         Task {
             do {
                 let rates = try await client.lineRates()
@@ -1334,7 +1337,7 @@ final class TrafficMonitor: ObservableObject {
 
     func poll() {
         guard !pollInFlight else { return }
-        guard let client = RouterClient.fromPreferences() else {
+        guard let client = configuredClient() else {
             status = L10n.string("status.enterCredentials")
             isConnecting = false
             isConnected = false
@@ -1415,47 +1418,95 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    private func configuredClient() -> RouterClient? {
+        guard let configuration = RouterClient.Configuration.fromPreferences() else {
+            client?.invalidate()
+            client = nil
+            return nil
+        }
+        if let client, client.matches(configuration) {
+            return client
+        }
+        client?.invalidate()
+        let newClient = RouterClient(configuration: configuration)
+        client = newClient
+        return newClient
+    }
+
     private static var pollIntervalSeconds: TimeInterval {
         let value = UserDefaults.standard.double(forKey: "pollIntervalSeconds")
         return value >= 1 ? value : 5
     }
 }
 
-struct RouterClient {
-    let host: String
-    let username: String
-    let password: String
+final class RouterClient {
+    struct Configuration: Equatable {
+        let host: String
+        let username: String
+        let password: String
+
+        static func fromPreferences() -> Configuration? {
+            let host = UserDefaults.standard.string(forKey: "routerHost")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let username = UserDefaults.standard.string(forKey: "routerUsername")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !host.isEmpty, !username.isEmpty, let password = Keychain.password(), !password.isEmpty else { return nil }
+            return Configuration(host: host, username: username, password: password)
+        }
+    }
+
+    private let configuration: Configuration
+    private let session: URLSession
+    private let delegate: DigestDelegate
     private static let service = "urn:dslforum-org:service:WANCommonInterfaceConfig:1"
     private static let dslService = "urn:dslforum-org:service:WANDSLInterfaceConfig:1"
+    private static let wanCommonControlPath = "/upnp/control/wancommonifconfig1"
+    private static let dslControlPath = "/upnp/control/wandslifconfig1"
+
+    private var host: String { configuration.host }
 
     static func fromPreferences() -> RouterClient? {
-        let host = UserDefaults.standard.string(forKey: "routerHost")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let username = UserDefaults.standard.string(forKey: "routerUsername")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !host.isEmpty, !username.isEmpty, let password = Keychain.password(), !password.isEmpty else { return nil }
-        return RouterClient(host: host, username: username, password: password)
+        guard let configuration = Configuration.fromPreferences() else { return nil }
+        return RouterClient(configuration: configuration)
+    }
+
+    static var hasPreferences: Bool {
+        Configuration.fromPreferences() != nil
+    }
+
+    init(configuration: Configuration) {
+        self.configuration = configuration
+        delegate = DigestDelegate(username: configuration.username, password: configuration.password)
+        let urlConfiguration = URLSessionConfiguration.ephemeral
+        urlConfiguration.httpMaximumConnectionsPerHost = 2
+        urlConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        urlConfiguration.timeoutIntervalForRequest = 4
+        urlConfiguration.timeoutIntervalForResource = 8
+        session = URLSession(configuration: urlConfiguration, delegate: delegate, delegateQueue: nil)
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+    }
+
+    func matches(_ configuration: Configuration) -> Bool {
+        self.configuration == configuration
+    }
+
+    func invalidate() {
+        session.invalidateAndCancel()
     }
 
     func counters() async throws -> (sent: UInt64, received: UInt64) {
-        async let sent = counter(action: "GetTotalBytesSent", field: "NewTotalBytesSent")
-        async let received = counter(action: "GetTotalBytesReceived", field: "NewTotalBytesReceived")
-        return try await (sent, received)
+        do {
+            return try await addonCounters()
+        } catch {
+            async let sent = counter(action: "GetTotalBytesSent", field: "NewTotalBytesSent")
+            async let received = counter(action: "GetTotalBytesReceived", field: "NewTotalBytesReceived")
+            return try await (sent, received)
+        }
     }
 
     func lineRates() async throws -> DSLLineRates {
-        guard let url = URL(string: "http://\(host):49000/upnp/control/wandslifconfig1") else { throw RouterAPIError.invalidHost }
-        let xml = """
-        <?xml version=\"1.0\" encoding=\"utf-8\"?>
-        <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:GetInfo xmlns:u=\"\(Self.dslService)\"/></s:Body></s:Envelope>
-        """
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = Data(xml.utf8)
-        request.setValue("text/xml; charset=\"utf-8\"", forHTTPHeaderField: "Content-Type")
-        request.setValue("\"\(Self.dslService)#GetInfo\"", forHTTPHeaderField: "SOAPAction")
-        let delegate = DigestDelegate(username: username, password: password)
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw RouterAPIError.requestFailed }
+        let data = try await soapData(controlPath: Self.dslControlPath, service: Self.dslService, action: "GetInfo")
         let root = try XMLDocument(data: data, options: [])
         func rate(_ field: String) throws -> Double {
             guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let kbitPerSecond = Double(text) else { throw RouterAPIError.invalidResponse }
@@ -1469,24 +1520,53 @@ struct RouterClient {
         )
     }
 
+    private func addonCounters() async throws -> (sent: UInt64, received: UInt64) {
+        let data = try await soapData(controlPath: Self.wanCommonControlPath, service: Self.service, action: "GetAddonInfos")
+        let root = try XMLDocument(data: data, options: [])
+        let sent = try counterValue(root: root, preferredField: "NewX_AVM_DE_TotalBytesSent64", fallbackField: "NewTotalBytesSent")
+        let received = try counterValue(root: root, preferredField: "NewX_AVM_DE_TotalBytesReceived64", fallbackField: "NewTotalBytesReceived")
+        return (sent, received)
+    }
+
     private func counter(action: String, field: String) async throws -> UInt64 {
-        guard let url = URL(string: "http://\(host):49000/upnp/control/wancommonifconfig1") else { throw RouterAPIError.invalidHost }
-        let xml = """
-        <?xml version=\"1.0\" encoding=\"utf-8\"?>
-        <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:\(action) xmlns:u=\"\(Self.service)\"/></s:Body></s:Envelope>
-        """
+        let data = try await soapData(controlPath: Self.wanCommonControlPath, service: Self.service, action: action)
+        let root = try XMLDocument(data: data, options: [])
+        return try counterValue(root: root, preferredField: field)
+    }
+
+    private func soapData(controlPath: String, service: String, action: String) async throws -> Data {
+        guard let url = URL(string: "http://\(host):49000\(controlPath)") else { throw RouterAPIError.invalidHost }
+        let xml = soapEnvelope(service: service, action: action)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = Data(xml.utf8)
         request.setValue("text/xml; charset=\"utf-8\"", forHTTPHeaderField: "Content-Type")
-        request.setValue("\"\(Self.service)#\(action)\"", forHTTPHeaderField: "SOAPAction")
-        let delegate = DigestDelegate(username: username, password: password)
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        request.setValue("\"\(service)#\(action)\"", forHTTPHeaderField: "SOAPAction")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw RouterAPIError.requestFailed }
-        let root = try XMLDocument(data: data, options: [])
-        guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue, let value = UInt64(text) else { throw RouterAPIError.invalidResponse }
-        return value
+        return data
+    }
+
+    private func soapEnvelope(service: String, action: String) -> String {
+        """
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>
+        <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:\(action) xmlns:u=\"\(service)\"/></s:Body></s:Envelope>
+        """
+    }
+
+    private func counterValue(root: XMLDocument, preferredField: String, fallbackField: String? = nil) throws -> UInt64 {
+        if let value = try value(root: root, field: preferredField) {
+            return value
+        }
+        if let fallbackField, let value = try value(root: root, field: fallbackField) {
+            return value
+        }
+        throw RouterAPIError.invalidResponse
+    }
+
+    private func value(root: XMLDocument, field: String) throws -> UInt64? {
+        guard let text = try root.nodes(forXPath: "//*[local-name() = '\(field)']").first?.stringValue else { return nil }
+        return UInt64(text)
     }
 }
 
