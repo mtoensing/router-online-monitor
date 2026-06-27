@@ -133,11 +133,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let labels = menuBarLabels()
         switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
         case "rate":
-            setMenuBarTitle(menuBarRateTitle(sample: sample, labels: labels))
+            setMenuBarRateTitle(
+                sample: sample,
+                downCapacity: downCapacity,
+                upCapacity: upCapacity,
+                labels: labels
+            )
         case "stableText":
-            setMenuBarTitle(menuBarStableTextTitle(sample: sample, labels: labels), stableWidth: true)
+            setMenuBarStableTextTitle(
+                sample: sample,
+                downCapacity: downCapacity,
+                upCapacity: upCapacity,
+                labels: labels
+            )
         case "percentage":
-            setMenuBarTitle(menuBarPercentageTitle(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity, labels: labels))
+            setMenuBarPercentageTitle(
+                sample: sample,
+                downCapacity: downCapacity,
+                upCapacity: upCapacity,
+                labels: labels
+            )
         default:
             setMenuBarUsageBars(
                 sample: sample,
@@ -186,23 +201,57 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func menuBarRateTitle(sample: TrafficSample, labels: (download: String, upload: String)) -> String {
-        "\(labels.download) \(TrafficFormatting.compactMbit(sample.downloadBitsPerSecond))  \(labels.upload) \(TrafficFormatting.compactMbit(sample.uploadBitsPerSecond))"
-    }
-
-    private func menuBarStableTextTitle(sample: TrafficSample, labels: (download: String, upload: String)) -> String {
-        "\(labels.download) \(TrafficFormatting.fixedWidthMbit(sample.downloadBitsPerSecond))  \(labels.upload) \(TrafficFormatting.fixedWidthMbit(sample.uploadBitsPerSecond))"
-    }
-
-    private func menuBarPercentageTitle(
+    private func setMenuBarRateTitle(
         sample: TrafficSample,
         downCapacity: Double,
         upCapacity: Double,
         labels: (download: String, upload: String)
-    ) -> String {
-        let download = menuBarPercentage(sample.downloadBitsPerSecond, capacity: downCapacity)
-        let upload = menuBarPercentage(sample.uploadBitsPerSecond, capacity: upCapacity)
-        return "\(labels.download) \(download)  \(labels.upload) \(upload)"
+    ) {
+        setMenuBarDirectionalTitle(
+            downloadLabel: labels.download,
+            downloadValue: TrafficFormatting.compactMbit(sample.downloadBitsPerSecond),
+            uploadLabel: labels.upload,
+            uploadValue: TrafficFormatting.compactMbit(sample.uploadBitsPerSecond),
+            font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+        )
+    }
+
+    private func setMenuBarStableTextTitle(
+        sample: TrafficSample,
+        downCapacity: Double,
+        upCapacity: Double,
+        labels: (download: String, upload: String)
+    ) {
+        let downloadValue = TrafficFormatting.fixedWidthMbit(sample.downloadBitsPerSecond)
+        let uploadValue = TrafficFormatting.fixedWidthMbit(sample.uploadBitsPerSecond)
+        setMenuBarDirectionalTitle(
+            downloadLabel: labels.download,
+            downloadValue: downloadValue,
+            uploadLabel: labels.upload,
+            uploadValue: uploadValue,
+            font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+        )
+    }
+
+    private func setMenuBarPercentageTitle(
+        sample: TrafficSample,
+        downCapacity: Double,
+        upCapacity: Double,
+        labels: (download: String, upload: String)
+    ) {
+        setMenuBarDirectionalTitle(
+            downloadLabel: labels.download,
+            downloadValue: menuBarPercentage(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadLabel: labels.upload,
+            uploadValue: menuBarPercentage(sample.uploadBitsPerSecond, capacity: upCapacity),
+            font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+        )
     }
 
     private func menuBarPercentage(_ bitsPerSecond: Double, capacity: Double) -> String {
@@ -210,20 +259,48 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return String(format: "%.0f%%", usageFraction(bitsPerSecond, capacity: capacity) * 100)
     }
 
-    private func setMenuBarTitle(_ title: String, stableWidth: Bool = false) {
+    private func setMenuBarTitle(_ title: String) {
+        setMenuBarAttributedTitle(NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: NSColor.labelColor,
+            ]
+        ))
+    }
+
+    private func setMenuBarDirectionalTitle(
+        downloadLabel: String,
+        downloadValue: String,
+        uploadLabel: String,
+        uploadValue: String,
+        font: NSFont,
+        downloadNearCapacity: Bool,
+        uploadNearCapacity: Bool
+    ) {
+        let title = NSMutableAttributedString()
+        let baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.labelColor,
+        ]
+        func append(_ string: String, color: NSColor = .labelColor) {
+            var attributes = baseAttributes
+            attributes[.foregroundColor] = color
+            title.append(NSAttributedString(string: string, attributes: attributes))
+        }
+        append("\(downloadLabel) ")
+        append(downloadValue, color: downloadNearCapacity ? .systemRed : .labelColor)
+        append("  \(uploadLabel) ")
+        append(uploadValue, color: uploadNearCapacity ? .systemRed : .labelColor)
+        setMenuBarAttributedTitle(title)
+    }
+
+    private func setMenuBarAttributedTitle(_ title: NSAttributedString) {
         guard let button = statusItem?.button else { return }
         statusItem?.length = NSStatusItem.variableLength
         button.image = nil
         button.imagePosition = .noImage
-        button.attributedTitle = NSAttributedString(
-            string: title,
-            attributes: [
-                .font: stableWidth
-                    ? NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-                    : NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-                .foregroundColor: NSColor.labelColor,
-            ]
-        )
+        button.attributedTitle = title
     }
 
     private static func menuBarArrowsImage() -> NSImage {
