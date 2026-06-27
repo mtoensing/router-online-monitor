@@ -134,6 +134,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
         case "rate":
             setMenuBarTitle(menuBarRateTitle(sample: sample, labels: labels))
+        case "stableText":
+            setMenuBarTitle(menuBarStableTextTitle(sample: sample, labels: labels), stableWidth: true)
         case "percentage":
             setMenuBarTitle(menuBarPercentageTitle(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity, labels: labels))
         default:
@@ -188,6 +190,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         "\(labels.download) \(TrafficFormatting.compactMbit(sample.downloadBitsPerSecond))  \(labels.upload) \(TrafficFormatting.compactMbit(sample.uploadBitsPerSecond))"
     }
 
+    private func menuBarStableTextTitle(sample: TrafficSample, labels: (download: String, upload: String)) -> String {
+        "\(labels.download) \(TrafficFormatting.fixedWidthMbit(sample.downloadBitsPerSecond))  \(labels.upload) \(TrafficFormatting.fixedWidthMbit(sample.uploadBitsPerSecond))"
+    }
+
     private func menuBarPercentageTitle(
         sample: TrafficSample,
         downCapacity: Double,
@@ -204,7 +210,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return String(format: "%.0f%%", usageFraction(bitsPerSecond, capacity: capacity) * 100)
     }
 
-    private func setMenuBarTitle(_ title: String) {
+    private func setMenuBarTitle(_ title: String, stableWidth: Bool = false) {
         guard let button = statusItem?.button else { return }
         statusItem?.length = NSStatusItem.variableLength
         button.image = nil
@@ -212,7 +218,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.attributedTitle = NSAttributedString(
             string: title,
             attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .font: stableWidth
+                    ? NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+                    : NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
                 .foregroundColor: NSColor.labelColor,
             ]
         )
@@ -452,6 +460,12 @@ enum TrafficFormatting {
             return L10n.string("traffic.lessThanOneMbit")
         }
         return L10n.format("traffic.mbit", mbitPerSecond.formatted(.number.precision(.fractionLength(0))))
+    }
+
+    static func fixedWidthMbit(_ bitsPerSecond: Double) -> String {
+        guard bitsPerSecond.isFinite else { return "  0 Mbit" }
+        let roundedMbit = min(max((bitsPerSecond / 1_000_000).rounded(), 0), 999)
+        return String(format: "%3.0f Mbit", roundedMbit)
     }
 }
 
@@ -1014,6 +1028,7 @@ struct SettingsView: View {
                 Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
                     Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
                     Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
+                    Text(L10n.string("picker.menuBarDisplay.stableText")).tag("stableText")
                     Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
                 }
                 if menuBarDisplayStyle == "rate" {
@@ -1100,6 +1115,8 @@ struct SettingsView: View {
         switch menuBarDisplayStyle {
         case "rate":
             return L10n.string("help.menuBarDisplay.rate")
+        case "stableText":
+            return L10n.string("help.menuBarDisplay.stableText")
         case "percentage":
             return L10n.string("help.menuBarDisplay.percentage")
         default:

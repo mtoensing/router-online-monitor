@@ -19,13 +19,19 @@ for localized_resources in Resources/*.lproj; do
     [ -d "$localized_resources" ] || continue
     cp -R "$localized_resources" "$app/Contents/Resources/"
 done
-find "$app" -exec xattr -c {} \; 2>/dev/null || true
-find "$app" -exec xattr -d com.apple.ResourceFork {} \; 2>/dev/null || true
-find "$app" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
-find "$app" -exec xattr -d 'com.apple.fileprovider.fpfs#P' {} \; 2>/dev/null || true
-find "$app" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
-xattr -d com.apple.FinderInfo "$app" 2>/dev/null || true
-find "$app" -name "*.bundle" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
+clean_extended_attributes() {
+    find "$app" -exec xattr -c {} \; 2>/dev/null || true
+    find "$app" -exec xattr -d com.apple.ResourceFork {} \; 2>/dev/null || true
+    find "$app" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
+    find "$app" -exec xattr -d 'com.apple.fileprovider.fpfs#P' {} \; 2>/dev/null || true
+    find "$app" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
+    xattr -d com.apple.FinderInfo "$app" 2>/dev/null || true
+    find "$app" -name "*.bundle" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
+}
+
+clean_extended_attributes
+sleep 1
+clean_extended_attributes
 signing_identity="${SIGNING_IDENTITY:--}"
 if [ "$signing_identity" = "-" ]; then
     codesign --force --deep --sign - "$app"

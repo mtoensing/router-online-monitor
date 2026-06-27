@@ -593,6 +593,22 @@
         }
       }
     },
+    "help.menuBarDisplay.stableText" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt Traffic-Werte mit fester Breite in einer Monospace-Schrift. Kleine Werte erscheinen als 0 Mbit statt als Kleiner-als-Text."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows fixed-width monospaced traffic values. Small values display as 0 Mbit instead of less-than text."
+          }
+        }
+      }
+    },
     "help.pollingInterval" : {
       "localizations" : {
         "de" : {
@@ -941,6 +957,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rectangles (Default)"
+          }
+        }
+      }
+    },
+    "picker.menuBarDisplay.stableText" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stabiler Text"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable text"
           }
         }
       }
