@@ -550,13 +550,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeigt nur das App-Symbol. Das Symbol wird rot, wenn Download oder Upload das erforderliche Leitungslimit erreicht."
+            "value" : "Zeigt nur das App-Symbol. Der jeweilige Pfeil wird rot, wenn Download oder Upload das erforderliche Leitungslimit erreicht."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows only the app icon. The icon turns red when download or upload reaches the required line speed limit."
+            "value" : "Shows only the app icon. The corresponding arrow turns red when download or upload reaches the required line speed limit."
           }
         }
       }

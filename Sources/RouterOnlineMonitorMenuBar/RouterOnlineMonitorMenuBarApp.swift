@@ -134,8 +134,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
         case "minimalist":
             setMenuBarIcon(
-                isAlerting: isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity) ||
-                    isAtCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+                downloadAtCapacity: isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+                uploadAtCapacity: isAtCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
         case "rate":
             setMenuBarRateTitle(
@@ -190,12 +190,17 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.imagePosition = .imageOnly
     }
 
-    private func setMenuBarIcon(isAlerting: Bool = false) {
+    private func setMenuBarIcon(downloadAtCapacity: Bool = false, uploadAtCapacity: Bool = false) {
         guard let button = statusItem?.button else { return }
+        let isAlerting = downloadAtCapacity || uploadAtCapacity
         statusItem?.length = NSStatusItem.squareLength
         button.title = ""
         button.attributedTitle = NSAttributedString()
-        button.image = Self.menuBarArrowsImage(drawingColor: isAlerting ? .systemRed : .black, isTemplate: !isAlerting)
+        button.image = Self.menuBarArrowsImage(
+            downloadColor: downloadAtCapacity ? .systemRed : .labelColor,
+            uploadColor: uploadAtCapacity ? .systemRed : .labelColor,
+            isTemplate: !isAlerting
+        )
         button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
@@ -320,9 +325,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.attributedTitle = title
     }
 
-    private static func menuBarArrowsImage(drawingColor: NSColor = .black, isTemplate: Bool = true) -> NSImage {
+    private static func menuBarArrowsImage(
+        downloadColor: NSColor = .black,
+        uploadColor: NSColor = .black,
+        isTemplate: Bool = true
+    ) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            drawingColor.setStroke()
             let strokeWidth: CGFloat = 2.2
 
             let down = NSBezierPath()
@@ -334,6 +342,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             down.move(to: NSPoint(x: 2.5, y: 7))
             down.line(to: NSPoint(x: 6, y: 3.5))
             down.line(to: NSPoint(x: 9.5, y: 7))
+            downloadColor.setStroke()
             down.stroke()
 
             let up = NSBezierPath()
@@ -345,6 +354,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             up.move(to: NSPoint(x: 8.5, y: 11))
             up.line(to: NSPoint(x: 12, y: 14.5))
             up.line(to: NSPoint(x: 15.5, y: 11))
+            uploadColor.setStroke()
             up.stroke()
 
             return true

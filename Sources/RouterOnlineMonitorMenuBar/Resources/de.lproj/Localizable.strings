@@ -32,7 +32,7 @@
 "field.upstreamCapacity" = "Max. Upstream (Mbit/s)";
 "field.username" = "Benutzername";
 "help.capacityLimits" = "Erforderlich. Maximale Downstream- und Upstream-Leitungsgeschwindigkeiten für Rechtecke, Prozentwerte und Warnungen nahe der Kapazitätsgrenze festlegen. Wenn die automatische Erkennung nicht verfügbar ist, beide Werte manuell eingeben.";
-"help.menuBarDisplay.minimalist" = "Zeigt nur das App-Symbol. Das Symbol wird rot, wenn Download oder Upload das erforderliche Leitungslimit erreicht.";
+"help.menuBarDisplay.minimalist" = "Zeigt nur das App-Symbol. Der jeweilige Pfeil wird rot, wenn Download oder Upload das erforderliche Leitungslimit erreicht.";
 "help.menuBarDisplay.percentage" = "Zeigt den aktuellen Verkehr als Prozentwerte der erforderlichen Leitungslimits.";
 "help.menuBarDisplay.rate" = "Zeigt den aktuellen Verkehr als Werte. Die Dezimalgenauigkeit gilt nur für diese Werteanzeige.";
 "help.menuBarDisplay.rectangles" = "Zeigt kompakte Nutzungsrechtecke anhand der erforderlichen Leitungslimits.";
