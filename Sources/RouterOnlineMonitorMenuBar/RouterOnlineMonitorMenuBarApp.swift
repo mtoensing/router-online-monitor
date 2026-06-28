@@ -171,11 +171,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func setMenuBarUsageBars(sample: TrafficSample, downCapacity: Double, upCapacity: Double, labels: (download: String, upload: String)) {
         guard let button = statusItem?.button else { return }
+        let downloadNearCapacity = isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity)
+        let uploadNearCapacity = isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
         let image = Self.menuBarUsageImage(
             downloadFraction: usageFraction(sample.downloadBitsPerSecond, capacity: downCapacity),
             uploadFraction: usageFraction(sample.uploadBitsPerSecond, capacity: upCapacity),
-            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity),
             downloadLabel: labels.download,
             uploadLabel: labels.upload
         )
@@ -183,7 +183,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         button.title = ""
         button.attributedTitle = NSAttributedString()
         button.image = image
-        button.contentTintColor = nil
+        button.contentTintColor = downloadNearCapacity || uploadNearCapacity ? .systemRed : nil
         button.imagePosition = .imageOnly
     }
 
@@ -347,15 +347,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private static func menuBarUsageImage(
         downloadFraction: Double,
         uploadFraction: Double,
-        downloadNearCapacity: Bool,
-        uploadNearCapacity: Bool,
         downloadLabel: String,
         uploadLabel: String
     ) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        let labelColor = NSColor.labelColor
-        let downloadColor = downloadNearCapacity ? NSColor.systemRed : labelColor
-        let uploadColor = uploadNearCapacity ? NSColor.systemRed : labelColor
+        let drawingColor = NSColor.black
         let measuringAttributes: [NSAttributedString.Key: Any] = [
             .font: font,
         ]
@@ -381,7 +377,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 barY: barY,
                 barSize: barSize,
                 labelGap: labelGap,
-                color: downloadColor,
+                color: drawingColor,
                 font: font
             )
             x += groupGap
@@ -394,11 +390,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 barY: barY,
                 barSize: barSize,
                 labelGap: labelGap,
-                color: uploadColor,
+                color: drawingColor,
                 font: font
             )
             return true
         }
+        image.isTemplate = true
         return image
     }
 
