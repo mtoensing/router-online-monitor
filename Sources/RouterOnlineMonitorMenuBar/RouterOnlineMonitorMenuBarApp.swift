@@ -179,7 +179,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             uploadFraction: usageFraction(sample.uploadBitsPerSecond, capacity: upCapacity),
             downloadLabel: labels.download,
             uploadLabel: labels.upload,
-            drawingColor: isAlerting ? .systemRed : .black,
+            downloadColor: downloadNearCapacity ? .systemRed : .labelColor,
+            uploadColor: uploadNearCapacity ? .systemRed : .labelColor,
             isTemplate: !isAlerting
         )
         statusItem?.length = image.size.width + 8
@@ -290,18 +291,39 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         downloadNearCapacity: Bool,
         uploadNearCapacity: Bool
     ) {
-        let title = "\(downloadLabel) \(downloadValue)  \(uploadLabel) \(uploadValue)"
-        if downloadNearCapacity || uploadNearCapacity {
-            setMenuBarAttributedTitle(NSAttributedString(
-                string: title,
-                attributes: [
-                    .font: font,
-                    .foregroundColor: NSColor.systemRed,
-                ]
-            ))
-        } else {
+        let downloadPart = "\(downloadLabel) \(downloadValue)"
+        let uploadPart = "\(uploadLabel) \(uploadValue)"
+        let title = "\(downloadPart)  \(uploadPart)"
+        guard downloadNearCapacity || uploadNearCapacity else {
             setMenuBarPlainTitle(title, font: font)
+            return
         }
+
+        let attributedTitle = NSMutableAttributedString(
+            string: title,
+            attributes: [
+                .font: font,
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+        if downloadNearCapacity {
+            attributedTitle.addAttribute(
+                .foregroundColor,
+                value: NSColor.systemRed,
+                range: NSRange(location: 0, length: (downloadPart as NSString).length)
+            )
+        }
+        if uploadNearCapacity {
+            attributedTitle.addAttribute(
+                .foregroundColor,
+                value: NSColor.systemRed,
+                range: NSRange(
+                    location: (downloadPart as NSString).length + 2,
+                    length: (uploadPart as NSString).length
+                )
+            )
+        }
+        setMenuBarAttributedTitle(attributedTitle)
     }
 
     private func setMenuBarPlainTitle(_ title: String, font: NSFont) {
@@ -368,7 +390,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         uploadFraction: Double,
         downloadLabel: String,
         uploadLabel: String,
-        drawingColor: NSColor = .black,
+        downloadColor: NSColor = .black,
+        uploadColor: NSColor = .black,
         isTemplate: Bool = true
     ) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
@@ -397,7 +420,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 barY: barY,
                 barSize: barSize,
                 labelGap: labelGap,
-                color: drawingColor,
+                color: downloadColor,
                 font: font
             )
             x += groupGap
@@ -410,7 +433,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 barY: barY,
                 barSize: barSize,
                 labelGap: labelGap,
-                color: drawingColor,
+                color: uploadColor,
                 font: font
             )
             return true
