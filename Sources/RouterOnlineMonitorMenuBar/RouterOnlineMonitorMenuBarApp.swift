@@ -173,17 +173,20 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
         let downloadNearCapacity = isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity)
         let uploadNearCapacity = isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+        let isAlerting = downloadNearCapacity || uploadNearCapacity
         let image = Self.menuBarUsageImage(
             downloadFraction: usageFraction(sample.downloadBitsPerSecond, capacity: downCapacity),
             uploadFraction: usageFraction(sample.uploadBitsPerSecond, capacity: upCapacity),
             downloadLabel: labels.download,
-            uploadLabel: labels.upload
+            uploadLabel: labels.upload,
+            drawingColor: isAlerting ? .systemRed : .black,
+            isTemplate: !isAlerting
         )
         statusItem?.length = image.size.width + 8
         button.title = ""
         button.attributedTitle = NSAttributedString()
         button.image = image
-        button.contentTintColor = downloadNearCapacity || uploadNearCapacity ? .systemRed : nil
+        button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
 
@@ -192,8 +195,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         statusItem?.length = NSStatusItem.squareLength
         button.title = ""
         button.attributedTitle = NSAttributedString()
-        button.image = Self.menuBarArrowsImage()
-        button.contentTintColor = isAlerting ? .systemRed : nil
+        button.image = Self.menuBarArrowsImage(drawingColor: isAlerting ? .systemRed : .black, isTemplate: !isAlerting)
+        button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
 
@@ -267,13 +270,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func setMenuBarTitle(_ title: String) {
-        setMenuBarAttributedTitle(NSAttributedString(
-            string: title,
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-                .foregroundColor: NSColor.labelColor,
-            ]
-        ))
+        setMenuBarPlainTitle(
+            title,
+            font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        )
     }
 
     private func setMenuBarDirectionalTitle(
@@ -285,35 +285,44 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         downloadNearCapacity: Bool,
         uploadNearCapacity: Bool
     ) {
-        let title = NSMutableAttributedString()
-        let baseAttributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.labelColor,
-        ]
-        func append(_ string: String, color: NSColor = .labelColor) {
-            var attributes = baseAttributes
-            attributes[.foregroundColor] = color
-            title.append(NSAttributedString(string: string, attributes: attributes))
+        let title = "\(downloadLabel) \(downloadValue)  \(uploadLabel) \(uploadValue)"
+        if downloadNearCapacity || uploadNearCapacity {
+            setMenuBarAttributedTitle(NSAttributedString(
+                string: title,
+                attributes: [
+                    .font: font,
+                    .foregroundColor: NSColor.systemRed,
+                ]
+            ))
+        } else {
+            setMenuBarPlainTitle(title, font: font)
         }
-        append("\(downloadLabel) ")
-        append(downloadValue, color: downloadNearCapacity ? .systemRed : .labelColor)
-        append("  \(uploadLabel) ")
-        append(uploadValue, color: uploadNearCapacity ? .systemRed : .labelColor)
-        setMenuBarAttributedTitle(title)
+    }
+
+    private func setMenuBarPlainTitle(_ title: String, font: NSFont) {
+        guard let button = statusItem?.button else { return }
+        statusItem?.length = NSStatusItem.variableLength
+        button.image = nil
+        button.contentTintColor = nil
+        button.imagePosition = .noImage
+        button.attributedTitle = NSAttributedString()
+        button.font = font
+        button.title = title
     }
 
     private func setMenuBarAttributedTitle(_ title: NSAttributedString) {
         guard let button = statusItem?.button else { return }
         statusItem?.length = NSStatusItem.variableLength
+        button.title = ""
         button.image = nil
         button.contentTintColor = nil
         button.imagePosition = .noImage
         button.attributedTitle = title
     }
 
-    private static func menuBarArrowsImage() -> NSImage {
+    private static func menuBarArrowsImage(drawingColor: NSColor = .black, isTemplate: Bool = true) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            NSColor.black.setStroke()
+            drawingColor.setStroke()
             let strokeWidth: CGFloat = 2.2
 
             let down = NSBezierPath()
@@ -340,7 +349,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
             return true
         }
-        image.isTemplate = true
+        image.isTemplate = isTemplate
         return image
     }
 
@@ -348,10 +357,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         downloadFraction: Double,
         uploadFraction: Double,
         downloadLabel: String,
-        uploadLabel: String
+        uploadLabel: String,
+        drawingColor: NSColor = .black,
+        isTemplate: Bool = true
     ) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        let drawingColor = NSColor.black
         let measuringAttributes: [NSAttributedString.Key: Any] = [
             .font: font,
         ]
@@ -395,7 +405,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             )
             return true
         }
-        image.isTemplate = true
+        image.isTemplate = isTemplate
         return image
     }
 
