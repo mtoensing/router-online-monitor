@@ -28,6 +28,32 @@ enum L10n {
     }
 }
 
+enum MenuBarDisplayStyle: String, CaseIterable, Identifiable {
+    case minimalist
+    case rectangles
+    case rate
+    case stableText
+    case percentage
+
+    var id: String { rawValue }
+
+    var pickerLocalizationKey: String {
+        "picker.menuBarDisplay.\(rawValue)"
+    }
+
+    var helpLocalizationKey: String {
+        "help.menuBarDisplay.\(rawValue)"
+    }
+
+    var showsDecimalPrecisionToggle: Bool {
+        self == .rate
+    }
+
+    var showsMenuBarLabelPicker: Bool {
+        self != .minimalist
+    }
+}
+
 @main
 enum RouterOnlineMonitorMenuBarApp {
     @MainActor private static var menuBarController: MenuBarController?
@@ -727,6 +753,7 @@ struct MenuPopoverView: View {
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                 }
                 .chartYAxisLabel("Mbit/s")
+                .frame(maxWidth: .infinity)
                 .frame(height: 170)
             }
 
@@ -750,6 +777,7 @@ struct MenuPopoverView: View {
             }
         }
         .padding(PopoverLayout.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .popoverCard()
     }
 
@@ -1155,20 +1183,18 @@ struct SettingsView: View {
         Group {
             Section {
                 Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
-                    Text(L10n.string("picker.menuBarDisplay.rectangles")).tag("rectangles")
-                    Text(L10n.string("picker.menuBarDisplay.minimalist")).tag("minimalist")
-                    Text(L10n.string("picker.menuBarDisplay.rate")).tag("rate")
-                    Text(L10n.string("picker.menuBarDisplay.stableText")).tag("stableText")
-                    Text(L10n.string("picker.menuBarDisplay.percentage")).tag("percentage")
+                    ForEach(MenuBarDisplayStyle.allCases) { style in
+                        Text(L10n.string(style.pickerLocalizationKey)).tag(style.rawValue)
+                    }
                 }
-                if menuBarDisplayStyle == "rate" {
+                if selectedMenuBarDisplayStyle.showsDecimalPrecisionToggle {
                     Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
                     Text(L10n.string("help.showOneDecimalPlace"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if menuBarDisplayStyle != "minimalist" {
+                if selectedMenuBarDisplayStyle.showsMenuBarLabelPicker {
                     Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
                         Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
                         Text(L10n.string("picker.menuBarLabels.short")).tag("short")
@@ -1243,19 +1269,12 @@ struct SettingsView: View {
         }
     }
 
+    private var selectedMenuBarDisplayStyle: MenuBarDisplayStyle {
+        MenuBarDisplayStyle(rawValue: menuBarDisplayStyle) ?? .rectangles
+    }
+
     private var menuBarDisplayHelp: String {
-        switch menuBarDisplayStyle {
-        case "minimalist":
-            return L10n.string("help.menuBarDisplay.minimalist")
-        case "rate":
-            return L10n.string("help.menuBarDisplay.rate")
-        case "stableText":
-            return L10n.string("help.menuBarDisplay.stableText")
-        case "percentage":
-            return L10n.string("help.menuBarDisplay.percentage")
-        default:
-            return L10n.string("help.menuBarDisplay.rectangles")
-        }
+        L10n.string(selectedMenuBarDisplayStyle.helpLocalizationKey)
     }
 
     private var needsCapacityValues: Bool {
