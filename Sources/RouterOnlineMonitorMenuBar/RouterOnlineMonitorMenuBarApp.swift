@@ -659,12 +659,38 @@ private enum PopoverLayout {
     static let cardPadding: CGFloat = 14
     static let formHorizontalPadding: CGFloat = 28
     static let actionBarBottomPadding: CGFloat = 8
+    static let minimumSettingsHeight: CGFloat = 240
+    static let nonSettingsHeightEstimate: CGFloat = 470
     static let maximumScreenMargin: CGFloat = 48
+}
+
+private struct ContentSizePreferenceKey: PreferenceKey {
+    static let defaultValue = CGSize.zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let nextValue = nextValue()
+        value = CGSize(
+            width: max(value.width, nextValue.width),
+            height: max(value.height, nextValue.height)
+        )
+    }
+}
+
+private struct QuitButtonFramePreferenceKey: PreferenceKey {
+    static let defaultValue = CGRect.null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let nextValue = nextValue()
+        if !nextValue.isNull {
+            value = nextValue
+        }
+    }
 }
 
 struct MenuPopoverView: View {
     @ObservedObject var monitor: TrafficMonitor
     let onContentSizeChange: (CGSize) -> Void
+    var onQuitButtonFrameChange: ((CGRect) -> Void)?
     @AppStorage("configPanelIsExpanded") private var isConfigPanelExpanded = true
     @AppStorage("configPanelUserPreferenceSet") private var configPanelUserPreferenceSet = false
     @State private var showsHiddenSettings = false
@@ -681,18 +707,26 @@ struct MenuPopoverView: View {
         }
         .padding(PopoverLayout.outerPadding)
         .frame(width: 540)
-        .frame(height: targetPopoverHeight, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
+        .coordinateSpace(name: "popover")
         .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: ContentSizePreferenceKey.self, value: proxy.size)
+            }
+        }
         .onAppear {
             applyDefaultConfigPanelState()
-            publishTargetContentSize()
         }
         .onChange(of: monitor.isConnected) { _ in
             applyDefaultConfigPanelState()
-            publishTargetContentSize()
         }
-        .onChange(of: isConfigPanelExpanded) { _ in
-            publishTargetContentSize()
+        .onPreferenceChange(ContentSizePreferenceKey.self) { size in
+            publishContentSize(size)
+        }
+        .onPreferenceChange(QuitButtonFramePreferenceKey.self) { frame in
+            guard !frame.isNull else { return }
+            onQuitButtonFrameChange?(frame)
         }
     }
 
@@ -701,24 +735,19 @@ struct MenuPopoverView: View {
         return max(420, visibleHeight - PopoverLayout.maximumScreenMargin)
     }
 
-    private var targetPopoverHeight: CGFloat {
-        isConfigPanelExpanded ? expandedPopoverHeight : collapsedPopoverHeight
-    }
-
-    private var collapsedPopoverHeight: CGFloat {
-        min(440, maximumPopoverHeight)
-    }
-
-    private var expandedPopoverHeight: CGFloat {
-        min(760, maximumPopoverHeight)
-    }
-
     private var maximumSettingsHeight: CGFloat {
-        max(300, expandedPopoverHeight - 400 - PopoverLayout.actionBarBottomPadding)
+        max(
+            PopoverLayout.minimumSettingsHeight,
+            maximumPopoverHeight - PopoverLayout.nonSettingsHeightEstimate - PopoverLayout.actionBarBottomPadding
+        )
     }
 
-    private func publishTargetContentSize() {
-        onContentSizeChange(CGSize(width: 540, height: ceil(targetPopoverHeight)))
+    private func publishContentSize(_ measuredSize: CGSize) {
+        guard measuredSize.width > 0, measuredSize.height > 0 else { return }
+        onContentSizeChange(CGSize(
+            width: 540,
+            height: ceil(min(measuredSize.height, maximumPopoverHeight))
+        ))
     }
 
     private var header: some View {
@@ -846,24 +875,37 @@ struct MenuPopoverView: View {
                 Divider()
                     .padding(.horizontal, PopoverLayout.cardPadding)
 
-                ScrollView(.vertical) {
-                    SettingsView(
-                        monitor: monitor,
-                        showsHiddenSettings: showsHiddenSettings,
-                        onSaved: {
-                            configPanelUserPreferenceSet = false
-                            applyDefaultConfigPanelState()
-                        }
-                    )
-                    .padding(.horizontal, PopoverLayout.formHorizontalPadding)
-                    .padding(.top, PopoverLayout.cardPadding)
-                    .padding(.bottom, PopoverLayout.cardPadding)
-                }
-                .scrollIndicators(.hidden)
-                .frame(height: maximumSettingsHeight)
+                settingsPane
             }
         }
         .popoverCard()
+    }
+
+    @ViewBuilder
+    private var settingsPane: some View {
+        if showsHiddenSettings {
+            ScrollView(.vertical) {
+                settingsContent
+            }
+            .scrollIndicators(.automatic)
+            .frame(height: maximumSettingsHeight)
+        } else {
+            settingsContent
+        }
+    }
+
+    private var settingsContent: some View {
+        SettingsView(
+            monitor: monitor,
+            showsHiddenSettings: showsHiddenSettings,
+            onSaved: {
+                configPanelUserPreferenceSet = false
+                applyDefaultConfigPanelState()
+            }
+        )
+        .padding(.horizontal, PopoverLayout.formHorizontalPadding)
+        .padding(.top, PopoverLayout.cardPadding)
+        .padding(.bottom, PopoverLayout.cardPadding)
     }
 
     private var footer: some View {
@@ -892,6 +934,15 @@ struct MenuPopoverView: View {
             .disabled(monitor.isRefreshing)
             Spacer()
             Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
+                .accessibilityIdentifier("quitButton")
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: QuitButtonFramePreferenceKey.self,
+                            value: proxy.frame(in: .named("popover"))
+                        )
+                    }
+                }
         }
         .padding(.horizontal, 4)
         .padding(.bottom, PopoverLayout.actionBarBottomPadding)
@@ -1283,12 +1334,19 @@ struct SettingsView: View {
             if showsHiddenSettings {
                 formSeparator
 
-                Section(L10n.string("section.hiddenSettings")) {
-                    TextField(L10n.string("field.pollingInterval"), value: $pollIntervalSeconds, format: .number)
+                Section {
+                    menuBarFormRow(L10n.string("field.pollingInterval")) {
+                        TextField("", value: $pollIntervalSeconds, format: .number)
+                            .labelsHidden()
+                            .accessibilityLabel(L10n.string("field.pollingInterval"))
+                    }
+                } header: {
+                    Text(L10n.string("section.hiddenSettings"))
+                        .padding(.leading, FormLayout.controlLeadingIndent)
+                } footer: {
                     Text(L10n.string("help.pollingInterval"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, FormLayout.controlLeadingIndent)
                 }
             }
         }
