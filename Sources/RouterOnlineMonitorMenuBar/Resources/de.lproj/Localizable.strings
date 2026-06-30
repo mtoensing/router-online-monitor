@@ -37,6 +37,7 @@
 "help.menuBarDisplay.rate" = "Zeigt den aktuellen Verkehr als Werte. Die Dezimalgenauigkeit gilt nur für diese Werteanzeige.";
 "help.menuBarDisplay.rectangles" = "Zeigt kompakte Nutzungsrechtecke anhand der erforderlichen Leitungslimits.";
 "help.menuBarDisplay.stableText" = "Zeigt Traffic-Werte mit fester Breite in einer Monospace-Schrift. Kleine Werte erscheinen als 0 Mbit statt als Kleiner-als-Text.";
+"help.highlightNearCapacityMenuBarItems" = "Färbt Menüleisten-Symbole oder -Werte rot, wenn Download oder Upload nahe am konfigurierten Leitungslimit liegt.";
 "help.pollingInterval" = "Mindestens 1 Sekunde. Werte unter 5 Sekunden können unruhiger wirken, weil manche Router Verkehrszähler in Bursts aktualisieren.";
 "help.showOneDecimalPlace" = "Gilt für die Verkehrsrate als Werteanzeige in der Menüleiste.";
 "help.toggleConfig" = "Konfiguration ein- oder ausklappen";
@@ -88,6 +89,7 @@
 "status.routerUnavailable" = "Router nicht verfügbar: %@";
 "status.savedToKeychain" = "Im Schlüsselbund gespeichert";
 "status.updated" = "Aktualisiert %@";
+"toggle.highlightNearCapacityMenuBarItems" = "Nähe zum Leitungslimit hervorheben";
 "toggle.showOneDecimalPlace" = "Eine Nachkommastelle anzeigen";
 "traffic.download" = "Download";
 "traffic.downloadWithValue" = "Download %@";

@@ -37,6 +37,7 @@
 "help.menuBarDisplay.rate" = "Shows current traffic as values. Decimal precision applies only to this value display.";
 "help.menuBarDisplay.rectangles" = "Shows compact usage rectangles based on the required line speed limits.";
 "help.menuBarDisplay.stableText" = "Shows fixed-width monospaced traffic values. Small values display as 0 Mbit instead of less-than text.";
+"help.highlightNearCapacityMenuBarItems" = "Turns menu-bar icons or values red when download or upload is near the configured line speed limit.";
 "help.pollingInterval" = "Minimum 1 second. Values below 5 seconds can look noisier because some routers update traffic counters in bursts.";
 "help.showOneDecimalPlace" = "Applies to the traffic-rate value display in the menu bar.";
 "help.toggleConfig" = "Expand or collapse configuration";
@@ -88,6 +89,7 @@
 "status.routerUnavailable" = "Router unavailable: %@";
 "status.savedToKeychain" = "Saved to Keychain";
 "status.updated" = "Updated %@";
+"toggle.highlightNearCapacityMenuBarItems" = "Near-capacity highlight";
 "toggle.showOneDecimalPlace" = "Show one decimal place";
 "traffic.download" = "Download";
 "traffic.downloadWithValue" = "Download %@";

@@ -625,6 +625,22 @@
         }
       }
     },
+    "help.highlightNearCapacityMenuBarItems" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Färbt Menüleisten-Symbole oder -Werte rot, wenn Download oder Upload nahe am konfigurierten Leitungslimit liegt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turns menu-bar icons or values red when download or upload is near the configured line speed limit."
+          }
+        }
+      }
+    },
     "help.pollingInterval" : {
       "localizations" : {
         "de" : {
@@ -1437,6 +1453,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Updated %@"
+          }
+        }
+      }
+    },
+    "toggle.highlightNearCapacityMenuBarItems" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nähe zum Leitungslimit hervorheben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Near-capacity highlight"
           }
         }
       }

@@ -54,11 +54,26 @@ enum MenuBarDisplayStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppDefaults {
+    static let highlightNearCapacityMenuBarItemsKey = "highlightNearCapacityMenuBarItems"
+
+    static func register() {
+        UserDefaults.standard.register(defaults: [
+            highlightNearCapacityMenuBarItemsKey: true
+        ])
+    }
+
+    static var highlightNearCapacityMenuBarItems: Bool {
+        UserDefaults.standard.object(forKey: highlightNearCapacityMenuBarItemsKey) as? Bool ?? true
+    }
+}
+
 @main
 enum RouterOnlineMonitorMenuBarApp {
     @MainActor private static var menuBarController: MenuBarController?
 
     @MainActor static func main() {
+        AppDefaults.register()
         let app = NSApplication.shared
         let controller = MenuBarController()
         menuBarController = controller
@@ -156,49 +171,60 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let sample = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
+        let highlightNearCapacity = AppDefaults.highlightNearCapacityMenuBarItems
         let labels = menuBarLabels()
         switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
         case "minimalist":
             setMenuBarIcon(
-                downloadAtCapacity: isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-                uploadAtCapacity: isAtCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+                downloadAtCapacity: highlightNearCapacity && isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+                uploadAtCapacity: highlightNearCapacity && isAtCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
             )
         case "rate":
             setMenuBarRateTitle(
                 sample: sample,
                 downCapacity: downCapacity,
                 upCapacity: upCapacity,
-                labels: labels
+                labels: labels,
+                highlightNearCapacity: highlightNearCapacity
             )
         case "stableText":
             setMenuBarStableTextTitle(
                 sample: sample,
                 downCapacity: downCapacity,
                 upCapacity: upCapacity,
-                labels: labels
+                labels: labels,
+                highlightNearCapacity: highlightNearCapacity
             )
         case "percentage":
             setMenuBarPercentageTitle(
                 sample: sample,
                 downCapacity: downCapacity,
                 upCapacity: upCapacity,
-                labels: labels
+                labels: labels,
+                highlightNearCapacity: highlightNearCapacity
             )
         default:
             setMenuBarUsageBars(
                 sample: sample,
                 downCapacity: downCapacity,
                 upCapacity: upCapacity,
-                labels: labels
+                labels: labels,
+                highlightNearCapacity: highlightNearCapacity
             )
         }
         statusItem?.button?.toolTip = menuBarTooltip(sample: sample, downCapacity: downCapacity, upCapacity: upCapacity)
     }
 
-    private func setMenuBarUsageBars(sample: TrafficSample, downCapacity: Double, upCapacity: Double, labels: (download: String, upload: String)) {
+    private func setMenuBarUsageBars(
+        sample: TrafficSample,
+        downCapacity: Double,
+        upCapacity: Double,
+        labels: (download: String, upload: String),
+        highlightNearCapacity: Bool
+    ) {
         guard let button = statusItem?.button else { return }
-        let downloadNearCapacity = isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity)
-        let uploadNearCapacity = isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+        let downloadNearCapacity = highlightNearCapacity && isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity)
+        let uploadNearCapacity = highlightNearCapacity && isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
         let isAlerting = downloadNearCapacity || uploadNearCapacity
         let image = Self.menuBarUsageImage(
             downloadFraction: usageFraction(sample.downloadBitsPerSecond, capacity: downCapacity),
@@ -247,7 +273,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         sample: TrafficSample,
         downCapacity: Double,
         upCapacity: Double,
-        labels: (download: String, upload: String)
+        labels: (download: String, upload: String),
+        highlightNearCapacity: Bool
     ) {
         setMenuBarDirectionalTitle(
             downloadLabel: labels.download,
@@ -255,8 +282,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             uploadLabel: labels.upload,
             uploadValue: TrafficFormatting.compactMbit(sample.uploadBitsPerSecond),
             font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            downloadNearCapacity: highlightNearCapacity && isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: highlightNearCapacity && isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
         )
     }
 
@@ -264,7 +291,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         sample: TrafficSample,
         downCapacity: Double,
         upCapacity: Double,
-        labels: (download: String, upload: String)
+        labels: (download: String, upload: String),
+        highlightNearCapacity: Bool
     ) {
         let downloadValue = TrafficFormatting.fixedWidthMbit(sample.downloadBitsPerSecond)
         let uploadValue = TrafficFormatting.fixedWidthMbit(sample.uploadBitsPerSecond)
@@ -274,8 +302,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             uploadLabel: labels.upload,
             uploadValue: uploadValue,
             font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            downloadNearCapacity: highlightNearCapacity && isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: highlightNearCapacity && isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
         )
     }
 
@@ -283,7 +311,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         sample: TrafficSample,
         downCapacity: Double,
         upCapacity: Double,
-        labels: (download: String, upload: String)
+        labels: (download: String, upload: String),
+        highlightNearCapacity: Bool
     ) {
         setMenuBarDirectionalTitle(
             downloadLabel: labels.download,
@@ -291,8 +320,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             uploadLabel: labels.upload,
             uploadValue: menuBarPercentage(sample.uploadBitsPerSecond, capacity: upCapacity),
             font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-            downloadNearCapacity: isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
-            uploadNearCapacity: isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
+            downloadNearCapacity: highlightNearCapacity && isNearCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
+            uploadNearCapacity: highlightNearCapacity && isNearCapacity(sample.uploadBitsPerSecond, capacity: upCapacity)
         )
     }
 
@@ -1012,6 +1041,7 @@ struct SettingsView: View {
     @AppStorage("menuBarDisplayStyle") private var menuBarDisplayStyle = "rectangles"
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
+    @AppStorage("highlightNearCapacityMenuBarItems") private var highlightNearCapacityMenuBarItems = true
     @AppStorage("pollIntervalSeconds") private var pollIntervalSeconds = 5.0
     @AppStorage("downstreamCapacityMbit") private var downstreamCapacityMbit = 0.0
     @AppStorage("upstreamCapacityMbit") private var upstreamCapacityMbit = 0.0
@@ -1048,6 +1078,9 @@ struct SettingsView: View {
             detectLineRates()
         }
         .onChange(of: showOneDecimalMbit) { _ in
+            monitor.refreshPresentation()
+        }
+        .onChange(of: highlightNearCapacityMenuBarItems) { _ in
             monitor.refreshPresentation()
         }
         .onChange(of: menuBarDisplayStyle) { _ in
@@ -1199,6 +1232,15 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .accessibilityLabel(L10n.string("picker.menuBarDisplay"))
+                }
+                menuBarControlRow {
+                    Toggle(L10n.string("toggle.highlightNearCapacityMenuBarItems"), isOn: $highlightNearCapacityMenuBarItems)
+                }
+                menuBarControlRow {
+                    Text(L10n.string("help.highlightNearCapacityMenuBarItems"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if selectedMenuBarDisplayStyle.showsDecimalPrecisionToggle {
                     menuBarControlRow {
