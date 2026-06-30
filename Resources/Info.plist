@@ -22,9 +22,9 @@
         <string>de</string>
     </array>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.52</string>
+    <string>1.0.53</string>
     <key>CFBundleVersion</key>
-    <string>53</string>
+    <string>54</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
