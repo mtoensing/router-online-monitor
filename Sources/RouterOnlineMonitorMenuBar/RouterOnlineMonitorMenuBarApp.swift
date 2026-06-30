@@ -989,6 +989,15 @@ private extension View {
 }
 
 struct SettingsView: View {
+    private enum FormLayout {
+        static let labelWidth: CGFloat = 202
+        static let labelSpacing: CGFloat = 18
+
+        static var controlLeadingIndent: CGFloat {
+            labelWidth + labelSpacing
+        }
+    }
+
     private enum SettingsTab: String, Hashable {
         case router
         case lineSpeed
@@ -1182,32 +1191,46 @@ struct SettingsView: View {
     private var menuBarSettingsTab: some View {
         Group {
             Section {
-                Picker(L10n.string("picker.menuBarDisplay"), selection: $menuBarDisplayStyle) {
-                    ForEach(MenuBarDisplayStyle.allCases) { style in
-                        Text(L10n.string(style.pickerLocalizationKey)).tag(style.rawValue)
+                menuBarFormRow(L10n.string("picker.menuBarDisplay")) {
+                    Picker("", selection: $menuBarDisplayStyle) {
+                        ForEach(MenuBarDisplayStyle.allCases) { style in
+                            Text(L10n.string(style.pickerLocalizationKey)).tag(style.rawValue)
+                        }
                     }
+                    .labelsHidden()
+                    .accessibilityLabel(L10n.string("picker.menuBarDisplay"))
                 }
                 if selectedMenuBarDisplayStyle.showsDecimalPrecisionToggle {
-                    Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
-                    Text(L10n.string("help.showOneDecimalPlace"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    menuBarControlRow {
+                        Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
+                    }
+                    menuBarControlRow {
+                        Text(L10n.string("help.showOneDecimalPlace"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 if selectedMenuBarDisplayStyle.showsMenuBarLabelPicker {
-                    Picker(L10n.string("picker.menuBarLabels"), selection: $menuBarLabelStyle) {
-                        Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
-                        Text(L10n.string("picker.menuBarLabels.short")).tag("short")
-                        Text(L10n.string("picker.menuBarLabels.words")).tag("words")
-                        Text(L10n.string("picker.menuBarLabels.network")).tag("network")
-                        Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
+                    menuBarFormRow(L10n.string("picker.menuBarLabels")) {
+                        Picker("", selection: $menuBarLabelStyle) {
+                            Text(L10n.string("picker.menuBarLabels.arrows")).tag("arrows")
+                            Text(L10n.string("picker.menuBarLabels.short")).tag("short")
+                            Text(L10n.string("picker.menuBarLabels.words")).tag("words")
+                            Text(L10n.string("picker.menuBarLabels.network")).tag("network")
+                            Text(L10n.string("picker.menuBarLabels.direction")).tag("direction")
+                        }
+                        .labelsHidden()
+                        .accessibilityLabel(L10n.string("picker.menuBarLabels"))
                     }
                 }
             } header: {
                 Text(L10n.string("section.menuBar"))
+                    .padding(.leading, FormLayout.controlLeadingIndent)
             } footer: {
                 Text(menuBarDisplayHelp)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, FormLayout.controlLeadingIndent)
             }
 
             if showsHiddenSettings {
@@ -1221,6 +1244,29 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+        }
+    }
+
+    private func menuBarFormRow<Content: View>(
+        _ label: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: FormLayout.labelSpacing) {
+            Text(label)
+                .frame(width: FormLayout.labelWidth, alignment: .trailing)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func menuBarControlRow<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: FormLayout.labelSpacing) {
+            Spacer()
+                .frame(width: FormLayout.labelWidth)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
