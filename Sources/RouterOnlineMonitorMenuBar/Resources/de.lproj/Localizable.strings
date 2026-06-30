@@ -72,6 +72,7 @@
 "routerDiscovery.notFound" = "Kein kompatibler Router im lokalen Netzwerk gefunden.";
 "routerDiscovery.searching" = "Lokales Netzwerk wird durchsucht …";
 "section.capacityLimits" = "Erforderliche Leitungslimits";
+"section.capacityWarning" = "Kapazitätswarnung";
 "section.config" = "Konfiguration";
 "section.hiddenSettings" = "Versteckte Einstellungen";
 "section.menuBar" = "Menüleiste";
@@ -89,7 +90,7 @@
 "status.routerUnavailable" = "Router nicht verfügbar: %@";
 "status.savedToKeychain" = "Im Schlüsselbund gespeichert";
 "status.updated" = "Aktualisiert %@";
-"toggle.highlightNearCapacityMenuBarItems" = "Nähe zum Leitungslimit hervorheben";
+"toggle.highlightNearCapacityMenuBarItems" = "Traffic nahe am Leitungslimit hervorheben";
 "toggle.showOneDecimalPlace" = "Eine Nachkommastelle anzeigen";
 "traffic.download" = "Download";
 "traffic.downloadWithValue" = "Download %@";

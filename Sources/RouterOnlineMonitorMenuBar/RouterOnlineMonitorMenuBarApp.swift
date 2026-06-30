@@ -658,6 +658,7 @@ private enum PopoverLayout {
     static let cardSpacing: CGFloat = 12
     static let cardPadding: CGFloat = 14
     static let formHorizontalPadding: CGFloat = 28
+    static let actionBarBottomPadding: CGFloat = 8
     static let maximumScreenMargin: CGFloat = 48
 }
 
@@ -713,7 +714,7 @@ struct MenuPopoverView: View {
     }
 
     private var maximumSettingsHeight: CGFloat {
-        max(240, expandedPopoverHeight - 430)
+        max(240, expandedPopoverHeight - 430 - PopoverLayout.actionBarBottomPadding)
     }
 
     private func publishTargetContentSize() {
@@ -740,6 +741,7 @@ struct MenuPopoverView: View {
             }
         }
         .padding(.horizontal, 4)
+        .padding(.bottom, PopoverLayout.actionBarBottomPadding)
     }
 
     private var monitoringCard: some View {
@@ -1233,15 +1235,6 @@ struct SettingsView: View {
                     .labelsHidden()
                     .accessibilityLabel(L10n.string("picker.menuBarDisplay"))
                 }
-                menuBarControlRow {
-                    Toggle(L10n.string("toggle.highlightNearCapacityMenuBarItems"), isOn: $highlightNearCapacityMenuBarItems)
-                }
-                menuBarControlRow {
-                    Text(L10n.string("help.highlightNearCapacityMenuBarItems"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
                 if selectedMenuBarDisplayStyle.showsDecimalPrecisionToggle {
                     menuBarControlRow {
                         Toggle(L10n.string("toggle.showOneDecimalPlace"), isOn: $showOneDecimalMbit)
@@ -1271,6 +1264,21 @@ struct SettingsView: View {
                     .padding(.leading, FormLayout.controlLeadingIndent)
             } footer: {
                 Text(menuBarDisplayHelp)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, FormLayout.controlLeadingIndent)
+            }
+
+            formSeparator
+
+            Section {
+                menuBarControlRow {
+                    Toggle(L10n.string("toggle.highlightNearCapacityMenuBarItems"), isOn: $highlightNearCapacityMenuBarItems)
+                }
+            } header: {
+                Text(L10n.string("section.capacityWarning"))
+                    .padding(.leading, FormLayout.controlLeadingIndent)
+            } footer: {
+                Text(L10n.string("help.highlightNearCapacityMenuBarItems"))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, FormLayout.controlLeadingIndent)
             }

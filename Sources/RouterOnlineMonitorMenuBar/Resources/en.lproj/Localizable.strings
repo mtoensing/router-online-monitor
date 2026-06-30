@@ -72,6 +72,7 @@
 "routerDiscovery.notFound" = "Could not find a compatible router on the local network.";
 "routerDiscovery.searching" = "Searching the local network…";
 "section.capacityLimits" = "Required line speed limits";
+"section.capacityWarning" = "Capacity warning";
 "section.config" = "Config";
 "section.hiddenSettings" = "Hidden settings";
 "section.menuBar" = "Menu bar";
@@ -89,7 +90,7 @@
 "status.routerUnavailable" = "Router unavailable: %@";
 "status.savedToKeychain" = "Saved to Keychain";
 "status.updated" = "Updated %@";
-"toggle.highlightNearCapacityMenuBarItems" = "Near-capacity highlight";
+"toggle.highlightNearCapacityMenuBarItems" = "Highlight near-capacity traffic";
 "toggle.showOneDecimalPlace" = "Show one decimal place";
 "traffic.download" = "Download";
 "traffic.downloadWithValue" = "Download %@";

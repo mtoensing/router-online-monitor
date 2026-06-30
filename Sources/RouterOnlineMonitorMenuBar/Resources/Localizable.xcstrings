@@ -1185,6 +1185,22 @@
         }
       }
     },
+    "section.capacityWarning" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapazitätswarnung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capacity warning"
+          }
+        }
+      }
+    },
     "section.config" : {
       "localizations" : {
         "de" : {
@@ -1462,13 +1478,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nähe zum Leitungslimit hervorheben"
+            "value" : "Traffic nahe am Leitungslimit hervorheben"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Near-capacity highlight"
+            "value" : "Highlight near-capacity traffic"
           }
         }
       }
