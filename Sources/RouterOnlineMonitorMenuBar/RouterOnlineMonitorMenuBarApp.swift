@@ -710,11 +710,11 @@ struct MenuPopoverView: View {
     }
 
     private var expandedPopoverHeight: CGFloat {
-        min(720, maximumPopoverHeight)
+        min(760, maximumPopoverHeight)
     }
 
     private var maximumSettingsHeight: CGFloat {
-        max(240, expandedPopoverHeight - 430 - PopoverLayout.actionBarBottomPadding)
+        max(300, expandedPopoverHeight - 400 - PopoverLayout.actionBarBottomPadding)
     }
 
     private func publishTargetContentSize() {
@@ -741,7 +741,6 @@ struct MenuPopoverView: View {
             }
         }
         .padding(.horizontal, 4)
-        .padding(.bottom, PopoverLayout.actionBarBottomPadding)
     }
 
     private var monitoringCard: some View {
@@ -860,7 +859,7 @@ struct MenuPopoverView: View {
                     .padding(.top, PopoverLayout.cardPadding)
                     .padding(.bottom, PopoverLayout.cardPadding)
                 }
-                .scrollIndicators(.automatic)
+                .scrollIndicators(.hidden)
                 .frame(height: maximumSettingsHeight)
             }
         }
@@ -895,6 +894,7 @@ struct MenuPopoverView: View {
             Button(L10n.string("button.quit")) { NSApp.terminate(nil) }
         }
         .padding(.horizontal, 4)
+        .padding(.bottom, PopoverLayout.actionBarBottomPadding)
     }
 
     private func format(_ bitsPerSecond: Double) -> String {
@@ -1271,12 +1271,9 @@ struct SettingsView: View {
             formSeparator
 
             Section {
-                menuBarControlRow {
+                menuBarFormRow(L10n.string("section.capacityWarning")) {
                     Toggle(L10n.string("toggle.highlightNearCapacityMenuBarItems"), isOn: $highlightNearCapacityMenuBarItems)
                 }
-            } header: {
-                Text(L10n.string("section.capacityWarning"))
-                    .padding(.leading, FormLayout.controlLeadingIndent)
             } footer: {
                 Text(L10n.string("help.highlightNearCapacityMenuBarItems"))
                     .fixedSize(horizontal: false, vertical: true)
