@@ -1,4 +1,3 @@
-import Charts
 import AppKit
 import Combine
 import Foundation
@@ -110,11 +109,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             let monitor = TrafficMonitor.shared
             popover.behavior = .transient
-            popover.contentViewController = NSHostingController(
-                rootView: MenuPopoverView(monitor: monitor) { [weak self] size in
-                    self?.updatePopoverContentSize(size)
-                }
-            )
             item.button?.target = self
             item.button?.action = #selector(togglePopover)
             samplesSubscription = monitor.$samples.sink { [weak self] _ in self?.updateMenuBar() }
@@ -604,6 +598,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            ensurePopoverContent()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
@@ -612,6 +607,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 self.constrainPopover(to: button)
             }
         }
+    }
+
+    private func ensurePopoverContent() {
+        guard popover.contentViewController == nil else { return }
+        let monitor = TrafficMonitor.shared
+        popover.contentViewController = NSHostingController(
+            rootView: MenuPopoverView(monitor: monitor) { [weak self] size in
+                self?.updatePopoverContentSize(size)
+            }
+        )
     }
 
     private func constrainPopover(to button: NSStatusBarButton) {
@@ -800,25 +805,7 @@ struct MenuPopoverView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, minHeight: 150)
             } else {
-                Chart(recentSamples) { sample in
-                    LineMark(
-                        x: .value(L10n.string("chart.axis.time"), sample.recordedAt),
-                        y: .value("Mbit/s", sample.downloadBitsPerSecond / 1_000_000),
-                        series: .value(L10n.string("chart.series.direction"), L10n.string("traffic.download"))
-                    )
-                    .foregroundStyle(.blue)
-                    .interpolationMethod(.linear)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                    LineMark(
-                        x: .value(L10n.string("chart.axis.time"), sample.recordedAt),
-                        y: .value("Mbit/s", sample.uploadBitsPerSecond / 1_000_000),
-                        series: .value(L10n.string("chart.series.direction"), L10n.string("traffic.upload"))
-                    )
-                    .foregroundStyle(Color(nsColor: .systemPink))
-                    .interpolationMethod(.linear)
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
-                }
-                .chartYAxisLabel("Mbit/s")
+                TrafficChartView(samples: recentSamples)
                 .frame(maxWidth: .infinity)
                 .frame(height: 170)
             }
@@ -1053,6 +1040,207 @@ private struct TrafficMetricView: View {
         }
         .foregroundStyle(color)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TrafficChartView: View {
+    let samples: [TrafficSample]
+
+    var body: some View {
+        Canvas { context, size in
+            let layout = TrafficChartLayout(size: size, samples: samples)
+            drawGrid(in: &context, layout: layout)
+            drawAxisLabels(in: &context, layout: layout)
+            drawLine(
+                in: &context,
+                layout: layout,
+                value: \.downloadBitsPerSecond,
+                color: .blue,
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+            )
+            drawLine(
+                in: &context,
+                layout: layout,
+                value: \.uploadBitsPerSecond,
+                color: Color(nsColor: .systemPink),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [5, 3])
+            )
+        }
+        .accessibilityLabel(L10n.string("chart.axis.time"))
+    }
+
+    private func drawGrid(in context: inout GraphicsContext, layout: TrafficChartLayout) {
+        var horizontalGrid = Path()
+        for tick in layout.yTicks {
+            horizontalGrid.move(to: CGPoint(x: layout.plotFrame.minX, y: tick.positionY))
+            horizontalGrid.addLine(to: CGPoint(x: layout.plotFrame.maxX, y: tick.positionY))
+        }
+        context.stroke(horizontalGrid, with: .color(Color(nsColor: .gridColor)), lineWidth: 0.6)
+
+        var verticalGrid = Path()
+        for tick in layout.xTicks {
+            verticalGrid.move(to: CGPoint(x: tick.positionX, y: layout.plotFrame.minY))
+            verticalGrid.addLine(to: CGPoint(x: tick.positionX, y: layout.plotFrame.maxY))
+        }
+        context.stroke(
+            verticalGrid,
+            with: .color(Color(nsColor: .gridColor)),
+            style: StrokeStyle(lineWidth: 0.6, dash: [4, 5])
+        )
+    }
+
+    private func drawAxisLabels(in context: inout GraphicsContext, layout: TrafficChartLayout) {
+        context.draw(
+            Text("Mbit/s")
+                .font(.caption)
+                .foregroundColor(.secondary),
+            at: CGPoint(x: layout.plotFrame.maxX + 4, y: layout.plotFrame.minY - 12),
+            anchor: .leading
+        )
+
+        for tick in layout.yTicks {
+            context.draw(
+                Text(TrafficChartScale.format(tick.value))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary),
+                at: CGPoint(x: layout.plotFrame.maxX + 4, y: tick.positionY),
+                anchor: .leading
+            )
+        }
+
+        for tick in layout.xTicks {
+            context.draw(
+                Text(tick.label)
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary),
+                at: CGPoint(x: tick.positionX, y: layout.plotFrame.maxY + 14),
+                anchor: .center
+            )
+        }
+    }
+
+    private func drawLine(
+        in context: inout GraphicsContext,
+        layout: TrafficChartLayout,
+        value: KeyPath<TrafficSample, Double>,
+        color: Color,
+        style: StrokeStyle
+    ) {
+        guard let firstSample = samples.first else { return }
+        var path = Path()
+        path.move(to: layout.point(for: firstSample, value: firstSample[keyPath: value]))
+        for sample in samples.dropFirst() {
+            path.addLine(to: layout.point(for: sample, value: sample[keyPath: value]))
+        }
+        context.stroke(path, with: .color(color), style: style)
+    }
+}
+
+private struct TrafficChartLayout {
+    struct AxisTick: Identifiable {
+        let id: Int
+        let value: Double
+        let positionY: CGFloat
+    }
+
+    struct TimeTick: Identifiable {
+        let id: Int
+        let label: String
+        let positionX: CGFloat
+    }
+
+    let plotFrame: CGRect
+    let yTicks: [AxisTick]
+    let xTicks: [TimeTick]
+
+    private let startDate: Date
+    private let endDate: Date
+    private let maxMbit: Double
+
+    init(size: CGSize, samples: [TrafficSample]) {
+        let plotFrame = CGRect(
+            x: 0,
+            y: 18,
+            width: max(1, size.width - 42),
+            height: max(1, size.height - 42)
+        )
+        let startDate = samples.first?.recordedAt ?? Date()
+        let endDate = samples.last?.recordedAt ?? startDate.addingTimeInterval(1)
+        let maxMbit = TrafficChartScale.upperBound(for: samples)
+
+        let yTicks = (0...3).map { index in
+            let value = maxMbit / 3 * Double(index)
+            return AxisTick(
+                id: index,
+                value: value,
+                positionY: plotFrame.maxY - plotFrame.height * CGFloat(value / maxMbit)
+            )
+        }
+
+        let duration = max(1, endDate.timeIntervalSince(startDate))
+        let xTicks = (1...5).map { index in
+            let fraction = Double(index) / 6
+            let date = startDate.addingTimeInterval(duration * fraction)
+            return TimeTick(
+                id: index,
+                label: date.formatted(date: .omitted, time: .shortened),
+                positionX: plotFrame.minX + plotFrame.width * CGFloat(fraction)
+            )
+        }
+
+        self.plotFrame = plotFrame
+        self.startDate = startDate
+        self.endDate = endDate
+        self.maxMbit = maxMbit
+        self.yTicks = yTicks
+        self.xTicks = xTicks
+    }
+
+    func point(for sample: TrafficSample, value bitsPerSecond: Double) -> CGPoint {
+        let duration = max(1, endDate.timeIntervalSince(startDate))
+        let timeFraction = sample.recordedAt.timeIntervalSince(startDate) / duration
+        let mbit = max(0, min(bitsPerSecond / 1_000_000, maxMbit))
+        return CGPoint(
+            x: plotFrame.minX + plotFrame.width * CGFloat(timeFraction),
+            y: plotFrame.maxY - plotFrame.height * CGFloat(mbit / maxMbit)
+        )
+    }
+}
+
+enum TrafficChartScale {
+    static func upperBound(for samples: [TrafficSample]) -> Double {
+        let maximumMbit = samples.reduce(0) { maximum, sample in
+            max(
+                maximum,
+                sample.downloadBitsPerSecond / 1_000_000,
+                sample.uploadBitsPerSecond / 1_000_000
+            )
+        }
+        return niceUpperBound(maximumMbit)
+    }
+
+    static func niceUpperBound(_ value: Double) -> Double {
+        guard value.isFinite, value > 0 else { return 1 }
+        let magnitude = pow(10, floor(log10(value)))
+        let normalized = value / magnitude
+        let niceNormalized: Double
+        switch normalized {
+        case ...1: niceNormalized = 1
+        case ...2: niceNormalized = 2
+        case ...3: niceNormalized = 3
+        case ...5: niceNormalized = 5
+        case ...6: niceNormalized = 6
+        case ...9: niceNormalized = 9
+        default: niceNormalized = 10
+        }
+        return niceNormalized * magnitude
+    }
+
+    static func format(_ value: Double) -> String {
+        if value >= 10 || value.rounded() == value {
+            return String(format: "%.0f", value)
+        }
+        return String(format: "%.1f", value)
     }
 }
 

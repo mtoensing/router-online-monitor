@@ -54,6 +54,30 @@ final class TrafficHistoryTests: XCTestCase {
         XCTAssertFalse(loadedSamples.contains { $0.recordedAt == expiredSample.recordedAt })
     }
 
+    func testChartScaleUsesReadableUpperBounds() {
+        XCTAssertEqual(TrafficChartScale.niceUpperBound(0), 1)
+        XCTAssertEqual(TrafficChartScale.niceUpperBound(2.4), 3)
+        XCTAssertEqual(TrafficChartScale.niceUpperBound(52), 60)
+        XCTAssertEqual(TrafficChartScale.niceUpperBound(87), 90)
+    }
+
+    func testChartScaleUsesLargestDirection() {
+        let samples = [
+            TrafficSample(
+                recordedAt: Date(timeIntervalSince1970: 1),
+                uploadBitsPerSecond: 3_000_000,
+                downloadBitsPerSecond: 12_000_000
+            ),
+            TrafficSample(
+                recordedAt: Date(timeIntervalSince1970: 2),
+                uploadBitsPerSecond: 52_000_000,
+                downloadBitsPerSecond: 6_000_000
+            ),
+        ]
+
+        XCTAssertEqual(TrafficChartScale.upperBound(for: samples), 60)
+    }
+
     private func sample(at date: Date) -> TrafficSample {
         TrafficSample(
             recordedAt: date,
