@@ -94,13 +94,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var connectingAnimationTimer: Timer?
     private var connectingAnimationStep = 0
     private var currentPopoverContentSize = CGSize.zero
+    private static let defaultMenuBarArrowsImage = menuBarArrowsImage()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            button.image = Self.menuBarArrowsImage()
+            button.image = Self.defaultMenuBarArrowsImage
             button.imagePosition = .imageOnly
             button.toolTip = L10n.string("menubar.tooltip.waitingForFirstSample")
         }
@@ -122,6 +123,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             connectingSubscription = monitor.$isConnecting.sink { [weak self] _ in self?.updateMenuBar() }
             updateMenuBar()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        TrafficMonitor.shared.persistSamples()
     }
 
     private func installMainMenu() {
@@ -249,11 +254,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         statusItem?.length = NSStatusItem.squareLength
         button.title = ""
         button.attributedTitle = NSAttributedString()
-        button.image = Self.menuBarArrowsImage(
-            downloadColor: downloadAtCapacity ? .systemRed : .labelColor,
-            uploadColor: uploadAtCapacity ? .systemRed : .labelColor,
-            isTemplate: !isAlerting
-        )
+        button.image = isAlerting
+            ? Self.menuBarArrowsImage(
+                downloadColor: downloadAtCapacity ? .systemRed : .labelColor,
+                uploadColor: uploadAtCapacity ? .systemRed : .labelColor,
+                isTemplate: false
+            )
+            : Self.defaultMenuBarArrowsImage
         button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
@@ -998,8 +1005,7 @@ struct MenuPopoverView: View {
 
     private var recentSamples: [TrafficSample] {
         let cutoff = Date().addingTimeInterval(-30 * 60)
-        return monitor.samples
-            .filter { $0.recordedAt >= cutoff }
+        return TrafficSampleSeries.recentSlice(from: monitor.samples, since: cutoff)
             .map(TrafficRateLimiter.cappedToConfiguredCapacities)
     }
 
@@ -1454,6 +1460,25 @@ struct TrafficSample: Codable, Identifiable {
     var id: Date { recordedAt }
 }
 
+enum TrafficHistoryPolicy {
+    static let retentionDuration: TimeInterval = 12 * 3600
+    static let maximumStoredSamples = 10_000
+    static let storageSaveInterval: TimeInterval = 60
+}
+
+enum TrafficSampleSeries {
+    static func recentSlice(from samples: [TrafficSample], since cutoff: Date) -> ArraySlice<TrafficSample> {
+        guard let lastOlderSampleIndex = samples.lastIndex(where: { $0.recordedAt < cutoff }) else {
+            return samples[...]
+        }
+        let firstRecentSampleIndex = samples.index(after: lastOlderSampleIndex)
+        guard firstRecentSampleIndex < samples.endIndex else {
+            return []
+        }
+        return samples[firstRecentSampleIndex...]
+    }
+}
+
 enum TrafficRateLimiter {
     static func cappedToConfiguredCapacities(_ sample: TrafficSample) -> TrafficSample {
         TrafficSample(
@@ -1484,7 +1509,6 @@ struct DSLLineRates {
 @MainActor
 final class TrafficMonitor: ObservableObject {
     static let shared = TrafficMonitor()
-    private static let maximumStoredSamples = 10_000
     @Published private(set) var samples: [TrafficSample] = []
     @Published private(set) var status = L10n.string("status.enterCredentials")
     @Published private(set) var preferencesVersion = 0
@@ -1499,6 +1523,8 @@ final class TrafficMonitor: ObservableObject {
     private var pollInFlight = false
     private var consecutivePollFailures = 0
     private var client: RouterClient?
+    private var lastStorageSaveAt: Date?
+    private var hasUnsavedSamples = false
 
     init() {
         samples = storage.load()
@@ -1506,6 +1532,11 @@ final class TrafficMonitor: ObservableObject {
         scheduleTimer()
         poll()
         prepopulateLineCapacities()
+    }
+
+    deinit {
+        timer?.invalidate()
+        client?.invalidate()
     }
 
     func reconfigure() {
@@ -1523,6 +1554,10 @@ final class TrafficMonitor: ObservableObject {
 
     func updatePollingInterval() {
         scheduleTimer()
+    }
+
+    func persistSamples() {
+        saveSamplesIfNeeded(now: Date(), force: true)
     }
 
     func prepopulateLineCapacities() {
@@ -1577,7 +1612,8 @@ final class TrafficMonitor: ObservableObject {
                         let sample = TrafficRateLimiter.cappedToConfiguredCapacities(rawSample)
                         samples.append(sample)
                         pruneSamples(now: now)
-                        storage.save(samples)
+                        hasUnsavedSamples = true
+                        saveSamplesIfNeeded(now: now)
                     }
                 } else {
                     status = L10n.string("status.connectedWaitingForSecondSample")
@@ -1613,10 +1649,20 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private func pruneSamples(now: Date) {
-        samples.removeAll { $0.recordedAt < now.addingTimeInterval(-12 * 3600) }
-        if samples.count > Self.maximumStoredSamples {
-            samples.removeFirst(samples.count - Self.maximumStoredSamples)
+        samples.removeAll { $0.recordedAt < now.addingTimeInterval(-TrafficHistoryPolicy.retentionDuration) }
+        if samples.count > TrafficHistoryPolicy.maximumStoredSamples {
+            samples = Array(samples.suffix(TrafficHistoryPolicy.maximumStoredSamples))
         }
+    }
+
+    private func saveSamplesIfNeeded(now: Date, force: Bool = false) {
+        guard hasUnsavedSamples else { return }
+        if !force, let lastStorageSaveAt, now.timeIntervalSince(lastStorageSaveAt) < TrafficHistoryPolicy.storageSaveInterval {
+            return
+        }
+        storage.save(samples)
+        lastStorageSaveAt = now
+        hasUnsavedSamples = false
     }
 
     private func scheduleTimer() {
@@ -1847,7 +1893,9 @@ enum RouterDiscovery {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 2
         configuration.timeoutIntervalForResource = 3
-        let (data, response) = try await URLSession(configuration: configuration).data(from: url)
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(from: url)
         guard let http = response as? HTTPURLResponse,
               http.statusCode == 200,
               let description = String(data: data, encoding: .utf8),
@@ -1865,20 +1913,26 @@ private extension Array where Element: Hashable {
 }
 
 final class SampleStorage {
-    private static let maximumStoredSamples = 10_000
     private let url: URL
+    private let now: () -> Date
 
-    init() {
-        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("RouterOnlineMonitor", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        url = folder.appendingPathComponent("samples.json")
+    init(url: URL? = nil, now: @escaping () -> Date = Date.init) {
+        if let url {
+            self.url = url
+        } else {
+            let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("RouterOnlineMonitor", isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            self.url = folder.appendingPathComponent("samples.json")
+        }
+        self.now = now
     }
 
     func load() -> [TrafficSample] {
         guard let data = try? Data(contentsOf: url), let samples = try? JSONDecoder().decode([TrafficSample].self, from: data) else { return [] }
-        let retainedSamples = samples.filter { $0.recordedAt > Date().addingTimeInterval(-12 * 3600) }
-        if retainedSamples.count > Self.maximumStoredSamples {
-            return Array(retainedSamples.suffix(Self.maximumStoredSamples))
+        let retentionCutoff = now().addingTimeInterval(-TrafficHistoryPolicy.retentionDuration)
+        let retainedSamples = samples.filter { $0.recordedAt > retentionCutoff }
+        if retainedSamples.count > TrafficHistoryPolicy.maximumStoredSamples {
+            return Array(retainedSamples.suffix(TrafficHistoryPolicy.maximumStoredSamples))
         }
         return retainedSamples
     }
