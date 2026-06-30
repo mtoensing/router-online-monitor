@@ -918,13 +918,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menüleisten-Anzeige"
+            "value" : "Anzeige"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menu-bar display"
+            "value" : "Display"
           }
         }
       }
@@ -1014,13 +1014,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menüleisten-Beschriftungen"
+            "value" : "Beschriftungen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menu-bar labels"
+            "value" : "Labels"
           }
         }
       }

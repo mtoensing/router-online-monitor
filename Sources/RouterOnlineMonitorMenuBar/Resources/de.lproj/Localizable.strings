@@ -55,13 +55,13 @@
 "menu.redo" = "Wiederholen";
 "menu.selectAll" = "Alles auswählen";
 "menu.undo" = "Widerrufen";
-"picker.menuBarDisplay" = "Menüleisten-Anzeige";
+"picker.menuBarDisplay" = "Anzeige";
 "picker.menuBarDisplay.minimalist" = "Minimalistisch";
 "picker.menuBarDisplay.percentage" = "Prozent";
 "picker.menuBarDisplay.rate" = "Verkehrsrate";
 "picker.menuBarDisplay.rectangles" = "Rechtecke (Standard)";
 "picker.menuBarDisplay.stableText" = "Stabiler Text";
-"picker.menuBarLabels" = "Menüleisten-Beschriftungen";
+"picker.menuBarLabels" = "Beschriftungen";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Standard)";
 "picker.menuBarLabels.direction" = "Ein / Aus";
 "picker.menuBarLabels.network" = "Rx / Tx";

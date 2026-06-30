@@ -55,13 +55,13 @@
 "menu.redo" = "Redo";
 "menu.selectAll" = "Select All";
 "menu.undo" = "Undo";
-"picker.menuBarDisplay" = "Menu-bar display";
+"picker.menuBarDisplay" = "Display";
 "picker.menuBarDisplay.minimalist" = "Minimalist";
 "picker.menuBarDisplay.percentage" = "Percentage";
 "picker.menuBarDisplay.rate" = "Traffic rate";
 "picker.menuBarDisplay.rectangles" = "Rectangles (Default)";
 "picker.menuBarDisplay.stableText" = "Stable text";
-"picker.menuBarLabels" = "Menu-bar labels";
+"picker.menuBarLabels" = "Labels";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Default)";
 "picker.menuBarLabels.direction" = "In / Out";
 "picker.menuBarLabels.network" = "Rx / Tx";
