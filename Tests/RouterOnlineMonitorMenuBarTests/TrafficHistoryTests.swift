@@ -124,7 +124,7 @@ final class TrafficHistoryTests: XCTestCase {
         XCTAssertEqual(TrafficChartScale.upperBound(for: samples), 60)
     }
 
-    func testChartScaleUsesTwentyPercentHeadroomWhenCapacityIsConfigured() {
+    func testChartScaleUsesMeasuredRatesWhenTheyExceedConfiguredCapacity() {
         let samples = [
             TrafficSample(
                 recordedAt: Date(timeIntervalSince1970: 1),
@@ -135,12 +135,12 @@ final class TrafficHistoryTests: XCTestCase {
 
         XCTAssertEqual(
             TrafficChartScale.upperBound(for: samples, configuredCapacityMbit: 108),
-            129.6,
+            300,
             accuracy: 0.001
         )
     }
 
-    func testChartScaleUsesDirectionSpecificCapacityWhenConfigured() {
+    func testChartScaleUsesDirectionSpecificMeasuredRateWhenItExceedsConfiguredCapacity() {
         let samples = [
             TrafficSample(
                 recordedAt: Date(timeIntervalSince1970: 1),
@@ -155,7 +155,23 @@ final class TrafficHistoryTests: XCTestCase {
                 value: \.uploadBitsPerSecond,
                 configuredCapacityMbit: 40
             ),
-            48,
+            90,
+            accuracy: 0.001
+        )
+    }
+
+    func testChartScaleCanStillShowConfiguredCapacityWhenItExceedsMeasuredRate() {
+        let samples = [
+            TrafficSample(
+                recordedAt: Date(timeIntervalSince1970: 1),
+                uploadBitsPerSecond: 5_000_000,
+                downloadBitsPerSecond: 12_000_000
+            ),
+        ]
+
+        XCTAssertEqual(
+            TrafficChartScale.upperBound(for: samples, configuredCapacityMbit: 108),
+            129.6,
             accuracy: 0.001
         )
     }

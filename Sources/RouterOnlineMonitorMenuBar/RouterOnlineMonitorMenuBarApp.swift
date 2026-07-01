@@ -207,7 +207,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSPopoverDelegat
             statusItem?.button?.toolTip = monitor.status
             return
         }
-        let sample = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
+        let sample = latestSample
         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
         let warningState = CapacityWarning.state(
@@ -846,7 +846,7 @@ struct MenuPopoverView: View {
             } else {
                 HStack(alignment: .center, spacing: 12) {
                     if let latestSample = monitor.samples.last {
-                        let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
+                        let latest = latestSample
                         let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
                         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
                         let warningState = CapacityWarning.state(
@@ -1031,10 +1031,8 @@ struct MenuPopoverView: View {
 
     private var recentSamples: [TrafficSample] {
         let cutoff = Date().addingTimeInterval(-30 * 60)
-        let cappedSamples = TrafficSampleSeries.recentSlice(from: monitor.samples, since: cutoff)
-            .map(TrafficRateLimiter.cappedToConfiguredCapacities)
         return TrafficSampleSeries.smoothedRates(
-            in: cappedSamples,
+            in: Array(TrafficSampleSeries.recentSlice(from: monitor.samples, since: cutoff)),
             window: TrafficSamplingPolicy.rateSmoothingWindow,
             maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
         )
@@ -1631,25 +1629,19 @@ enum TrafficChartScale {
         value: KeyPath<TrafficSample, Double>,
         configuredCapacityMbit: Double? = nil
     ) -> Double {
-        if let configuredCapacityMbit,
-           configuredCapacityMbit.isFinite,
-           configuredCapacityMbit > 0 {
-            return configuredCapacityMbit * 1.2
-        }
-
         let maximumMbit = samples.reduce(0) { maximum, sample in
             max(maximum, sample[keyPath: value] / 1_000_000)
         }
-        return niceUpperBound(maximumMbit)
+        let measuredUpperBound = niceUpperBound(maximumMbit)
+        guard let configuredCapacityMbit,
+              configuredCapacityMbit.isFinite,
+              configuredCapacityMbit > 0 else {
+            return measuredUpperBound
+        }
+        return max(measuredUpperBound, configuredCapacityMbit * 1.2)
     }
 
     static func upperBound(for samples: [TrafficSample], configuredCapacityMbit: Double? = nil) -> Double {
-        if let configuredCapacityMbit,
-           configuredCapacityMbit.isFinite,
-           configuredCapacityMbit > 0 {
-            return configuredCapacityMbit * 1.2
-        }
-
         let maximumMbit = samples.reduce(0) { maximum, sample in
             max(
                 maximum,
@@ -1657,7 +1649,13 @@ enum TrafficChartScale {
                 sample.uploadBitsPerSecond / 1_000_000
             )
         }
-        return niceUpperBound(maximumMbit)
+        let measuredUpperBound = niceUpperBound(maximumMbit)
+        guard let configuredCapacityMbit,
+              configuredCapacityMbit.isFinite,
+              configuredCapacityMbit > 0 else {
+            return measuredUpperBound
+        }
+        return max(measuredUpperBound, configuredCapacityMbit * 1.2)
     }
 
     static func configuredCapacitiesMbit(defaults: UserDefaults = .standard) -> (download: Double?, upload: Double?) {
@@ -2185,26 +2183,6 @@ enum TrafficSampleSeries {
     }
 }
 
-enum TrafficRateLimiter {
-    static func cappedToConfiguredCapacities(_ sample: TrafficSample) -> TrafficSample {
-        TrafficSample(
-            recordedAt: sample.recordedAt,
-            uploadBitsPerSecond: cappedRate(sample.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"),
-            downloadBitsPerSecond: cappedRate(sample.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit")
-        )
-    }
-
-    private static func cappedRate(_ bitsPerSecond: Double, capacityKey: String) -> Double {
-        guard bitsPerSecond.isFinite else { return 0 }
-        let nonNegativeRate = max(bitsPerSecond, 0)
-        let capacityBitsPerSecond = UserDefaults.standard.double(forKey: capacityKey) * 1_000_000
-        guard capacityBitsPerSecond.isFinite, capacityBitsPerSecond > 0 else {
-            return nonNegativeRate
-        }
-        return min(nonNegativeRate, capacityBitsPerSecond)
-    }
-}
-
 struct DSLLineRates {
     let currentDownstreamMbit: Double
     let currentUpstreamMbit: Double
@@ -2375,8 +2353,7 @@ final class TrafficMonitor: ObservableObject {
                 let counters = try await client.counters()
                 let now = Date()
                 let observation = TrafficCounterObservation(recordedAt: now, sent: counters.sent, received: counters.received)
-                if let rawSample = TrafficRateEstimator.sample(from: counterObservations, to: observation) {
-                    let sample = TrafficRateLimiter.cappedToConfiguredCapacities(rawSample)
+                if let sample = TrafficRateEstimator.sample(from: counterObservations, to: observation) {
                     samples.append(sample)
                     pruneSamples(now: now)
                     hasUnsavedSamples = true
