@@ -116,6 +116,37 @@ final class TrafficHistoryTests: XCTestCase {
         XCTAssertEqual(TrafficChartScale.upperBound(for: samples), 60)
     }
 
+    func testChartScaleUsesTwentyPercentHeadroomWhenCapacityIsConfigured() {
+        let samples = [
+            TrafficSample(
+                recordedAt: Date(timeIntervalSince1970: 1),
+                uploadBitsPerSecond: 5_000_000,
+                downloadBitsPerSecond: 230_000_000
+            ),
+        ]
+
+        XCTAssertEqual(
+            TrafficChartScale.upperBound(for: samples, configuredCapacityMbit: 108),
+            129.6,
+            accuracy: 0.001
+        )
+    }
+
+    func testChartScaleReadsLargestConfiguredCapacity() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(108.187, forKey: "downstreamCapacityMbit")
+        defaults.set(20.5, forKey: "upstreamCapacityMbit")
+
+        XCTAssertEqual(
+            TrafficChartScale.configuredCapacityUpperBoundMbit(defaults: defaults) ?? 0,
+            108.187,
+            accuracy: 0.001
+        )
+    }
+
     func testChartInterpolationCreatesCurveSegmentsBetweenSamples() {
         let points = [
             CGPoint(x: 0, y: 10),

@@ -1211,7 +1211,10 @@ private struct TrafficChartLayout {
         )
         let startDate = samples.first?.recordedAt ?? Date()
         let endDate = samples.last?.recordedAt ?? startDate.addingTimeInterval(1)
-        let maxMbit = TrafficChartScale.upperBound(for: samples)
+        let maxMbit = TrafficChartScale.upperBound(
+            for: samples,
+            configuredCapacityMbit: TrafficChartScale.configuredCapacityUpperBoundMbit()
+        )
 
         let yTicks = (0...3).map { index in
             let value = maxMbit / 3 * Double(index)
@@ -1431,7 +1434,13 @@ private extension CGPoint {
 }
 
 enum TrafficChartScale {
-    static func upperBound(for samples: [TrafficSample]) -> Double {
+    static func upperBound(for samples: [TrafficSample], configuredCapacityMbit: Double? = nil) -> Double {
+        if let configuredCapacityMbit,
+           configuredCapacityMbit.isFinite,
+           configuredCapacityMbit > 0 {
+            return configuredCapacityMbit * 1.2
+        }
+
         let maximumMbit = samples.reduce(0) { maximum, sample in
             max(
                 maximum,
@@ -1440,6 +1449,15 @@ enum TrafficChartScale {
             )
         }
         return niceUpperBound(maximumMbit)
+    }
+
+    static func configuredCapacityUpperBoundMbit(defaults: UserDefaults = .standard) -> Double? {
+        let capacities = [
+            defaults.double(forKey: "downstreamCapacityMbit"),
+            defaults.double(forKey: "upstreamCapacityMbit"),
+        ].filter { $0.isFinite && $0 > 0 }
+
+        return capacities.max()
     }
 
     static func niceUpperBound(_ value: Double) -> Double {
