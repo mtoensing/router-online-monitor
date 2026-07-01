@@ -2001,13 +2001,19 @@ struct SettingsView: View {
 
     private func detectLineRates(using configuration: RouterClient.Configuration) {
         let client = RouterClient(configuration: configuration)
+        let startingDownstreamCapacityMbit = downstreamCapacityMbit
+        let startingUpstreamCapacityMbit = upstreamCapacityMbit
         Task {
             do {
                 let rates = try await client.lineRates()
                 detectedLineRates = rates
                 detectionError = nil
-                if downstreamCapacityMbit <= 0 { downstreamCapacityMbit = rates.currentDownstreamMbit }
-                if upstreamCapacityMbit <= 0 { upstreamCapacityMbit = rates.currentUpstreamMbit }
+                if CapacityAutoFill.shouldApply(startingValue: startingDownstreamCapacityMbit, currentValue: downstreamCapacityMbit) {
+                    downstreamCapacityMbit = rates.currentDownstreamMbit
+                }
+                if CapacityAutoFill.shouldApply(startingValue: startingUpstreamCapacityMbit, currentValue: upstreamCapacityMbit) {
+                    upstreamCapacityMbit = rates.currentUpstreamMbit
+                }
             } catch {
                 detectionError = L10n.string("lineRate.error")
             }
@@ -2162,6 +2168,15 @@ struct DSLLineRates {
     let maximumUpstreamMbit: Double
 }
 
+enum CapacityAutoFill {
+    static func shouldApply(startingValue: Double, currentValue: Double) -> Bool {
+        startingValue.isFinite
+        && currentValue.isFinite
+        && startingValue <= 0
+        && currentValue == startingValue
+    }
+}
+
 struct TrafficCounterObservation {
     let recordedAt: Date
     let sent: UInt64
@@ -2263,18 +2278,31 @@ final class TrafficMonitor: ObservableObject {
 
     func prepopulateLineCapacities() {
         let defaults = UserDefaults.standard
-        guard defaults.double(forKey: "downstreamCapacityMbit") <= 0 || defaults.double(forKey: "upstreamCapacityMbit") <= 0,
+        let startingDownstreamCapacityMbit = defaults.double(forKey: "downstreamCapacityMbit")
+        let startingUpstreamCapacityMbit = defaults.double(forKey: "upstreamCapacityMbit")
+        guard startingDownstreamCapacityMbit <= 0 || startingUpstreamCapacityMbit <= 0,
               let client = configuredClient() else { return }
         Task {
             do {
                 let rates = try await client.lineRates()
-                if defaults.double(forKey: "downstreamCapacityMbit") <= 0 {
+                var didUpdateCapacity = false
+                if CapacityAutoFill.shouldApply(
+                    startingValue: startingDownstreamCapacityMbit,
+                    currentValue: defaults.double(forKey: "downstreamCapacityMbit")
+                ) {
                     defaults.set(rates.currentDownstreamMbit, forKey: "downstreamCapacityMbit")
+                    didUpdateCapacity = true
                 }
-                if defaults.double(forKey: "upstreamCapacityMbit") <= 0 {
+                if CapacityAutoFill.shouldApply(
+                    startingValue: startingUpstreamCapacityMbit,
+                    currentValue: defaults.double(forKey: "upstreamCapacityMbit")
+                ) {
                     defaults.set(rates.currentUpstreamMbit, forKey: "upstreamCapacityMbit")
+                    didUpdateCapacity = true
                 }
-                preferencesVersion += 1
+                if didUpdateCapacity {
+                    preferencesVersion += 1
+                }
             } catch {
                 NSLog("Could not prepopulate DSL line capacities: %@", error.localizedDescription)
             }
