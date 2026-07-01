@@ -43,7 +43,11 @@ final class TrafficHistoryTests: XCTestCase {
             sample(at: start.addingTimeInterval(15), downloadBitsPerSecond: 108_000_000),
         ]
 
-        let smoothed = TrafficSampleSeries.smoothedRates(in: samples, window: 15, maximumGap: 60)
+        let smoothed = TrafficSampleSeries.smoothedRates(
+            in: samples,
+            window: TrafficSamplingPolicy.rateSmoothingWindow,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
+        )
 
         XCTAssertEqual(smoothed.map { round($0.downloadBitsPerSecond / 1_000_000) }, [
             108,
@@ -61,7 +65,11 @@ final class TrafficHistoryTests: XCTestCase {
             sample(at: start.addingTimeInterval(65), downloadBitsPerSecond: 10_000_000),
         ]
 
-        let smoothed = TrafficSampleSeries.smoothedRates(in: samples, window: 15, maximumGap: 60)
+        let smoothed = TrafficSampleSeries.smoothedRates(
+            in: samples,
+            window: TrafficSamplingPolicy.rateSmoothingWindow,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
+        )
 
         XCTAssertEqual(smoothed.map(\.downloadBitsPerSecond), [
             100_000_000,
@@ -218,7 +226,10 @@ final class TrafficHistoryTests: XCTestCase {
             chartPoint(at: start.addingTimeInterval(70), point: CGPoint(x: 70, y: 8)),
         ]
 
-        let runs = TrafficChartInterpolation.contiguousRuns(in: points, maximumGap: 60)
+        let runs = TrafficChartInterpolation.contiguousRuns(
+            in: points,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
+        )
 
         XCTAssertEqual(runs.count, 2)
         XCTAssertEqual(runs[0].map(\.point), [points[0].point, points[1].point])
@@ -232,7 +243,10 @@ final class TrafficHistoryTests: XCTestCase {
             chartPoint(at: start.addingTimeInterval(59.9), point: CGPoint(x: 59.9, y: 6)),
         ]
 
-        let runs = TrafficChartInterpolation.contiguousRuns(in: points, maximumGap: 60)
+        let runs = TrafficChartInterpolation.contiguousRuns(
+            in: points,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
+        )
 
         XCTAssertEqual(runs.count, 1)
         XCTAssertEqual(runs[0].map(\.point), points.map(\.point))
@@ -247,7 +261,10 @@ final class TrafficHistoryTests: XCTestCase {
             chartPoint(at: start.addingTimeInterval(70), point: CGPoint(x: 70, y: 8)),
         ]
 
-        let markerPoints = TrafficChartInterpolation.gapMarkerPoints(in: points, maximumGap: 60)
+        let markerPoints = TrafficChartInterpolation.gapMarkerPoints(
+            in: points,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
+        )
 
         XCTAssertEqual(markerPoints, [points[1].point, points[2].point])
     }

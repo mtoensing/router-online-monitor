@@ -1004,8 +1004,8 @@ struct MenuPopoverView: View {
             .map(TrafficRateLimiter.cappedToConfiguredCapacities)
         return TrafficSampleSeries.smoothedRates(
             in: cappedSamples,
-            window: TrafficRateEstimator.rateWindow,
-            maximumGap: TrafficRateEstimator.maximumSampleGap
+            window: TrafficSamplingPolicy.rateSmoothingWindow,
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
         )
     }
 
@@ -1057,8 +1057,6 @@ private struct TrafficMetricView: View {
 }
 
 private struct TrafficChartView: View {
-    private static let maximumInterpolatedSampleGap: TimeInterval = 60
-
     let samples: [TrafficSample]
 
     var body: some View {
@@ -1066,7 +1064,7 @@ private struct TrafficChartView: View {
             let layout = TrafficChartLayout(size: size, samples: samples)
             drawGrid(in: &context, layout: layout)
             drawAxisLabels(in: &context, layout: layout)
-            drawLine(
+            drawTrafficSeries(
                 in: &context,
                 layout: layout,
                 value: \.downloadBitsPerSecond,
@@ -1074,7 +1072,7 @@ private struct TrafficChartView: View {
                 fillOpacity: 0.08,
                 style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
             )
-            drawLine(
+            drawTrafficSeries(
                 in: &context,
                 layout: layout,
                 value: \.uploadBitsPerSecond,
@@ -1136,7 +1134,7 @@ private struct TrafficChartView: View {
         }
     }
 
-    private func drawLine(
+    private func drawTrafficSeries(
         in context: inout GraphicsContext,
         layout: TrafficChartLayout,
         value: KeyPath<TrafficSample, Double>,
@@ -1153,7 +1151,7 @@ private struct TrafficChartView: View {
 
         for run in TrafficChartInterpolation.contiguousRuns(
             in: chartPoints,
-            maximumGap: Self.maximumInterpolatedSampleGap
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
         ) where run.count > 1 {
             let points = run.map(\.point)
             let fillPath = TrafficChartInterpolation.areaPath(
@@ -1168,7 +1166,7 @@ private struct TrafficChartView: View {
 
         for point in TrafficChartInterpolation.gapMarkerPoints(
             in: chartPoints,
-            maximumGap: Self.maximumInterpolatedSampleGap
+            maximumGap: TrafficSamplingPolicy.maximumContinuousSampleGap
         ) {
             let markerFrame = CGRect(
                 x: point.x - 2,
@@ -1895,6 +1893,11 @@ enum TrafficHistoryPolicy {
     static let storageSaveInterval: TimeInterval = 60
 }
 
+enum TrafficSamplingPolicy {
+    static let rateSmoothingWindow: TimeInterval = 15
+    static let maximumContinuousSampleGap: TimeInterval = 60
+}
+
 enum TrafficSampleSeries {
     static func recentSlice(from samples: [TrafficSample], since cutoff: Date) -> ArraySlice<TrafficSample> {
         guard let lastOlderSampleIndex = samples.lastIndex(where: { $0.recordedAt < cutoff }) else {
@@ -1980,17 +1983,14 @@ struct TrafficCounterObservation {
 }
 
 enum TrafficRateEstimator {
-    static let rateWindow: TimeInterval = 15
-    static let maximumSampleGap: TimeInterval = 60
-
     static func sample(from observations: [TrafficCounterObservation], to current: TrafficCounterObservation) -> TrafficSample? {
         guard let previous = observations.last else { return nil }
         let previousElapsed = current.recordedAt.timeIntervalSince(previous.recordedAt)
         guard previousElapsed > 0 else { return nil }
-        guard previousElapsed < maximumSampleGap else { return nil }
+        guard previousElapsed < TrafficSamplingPolicy.maximumContinuousSampleGap else { return nil }
 
         let baseline = observations.last(where: {
-            current.recordedAt.timeIntervalSince($0.recordedAt) >= rateWindow
+            current.recordedAt.timeIntervalSince($0.recordedAt) >= TrafficSamplingPolicy.rateSmoothingWindow
         }) ?? observations.first ?? previous
         let elapsed = current.recordedAt.timeIntervalSince(baseline.recordedAt)
         guard elapsed > 0 else { return nil }
@@ -2004,12 +2004,12 @@ enum TrafficRateEstimator {
 
     static func observations(afterAdding current: TrafficCounterObservation, to observations: [TrafficCounterObservation]) -> [TrafficCounterObservation] {
         if let previous = observations.last,
-           current.recordedAt.timeIntervalSince(previous.recordedAt) >= maximumSampleGap {
+           current.recordedAt.timeIntervalSince(previous.recordedAt) >= TrafficSamplingPolicy.maximumContinuousSampleGap {
             return [current]
         }
 
         return (observations + [current]).filter {
-            current.recordedAt.timeIntervalSince($0.recordedAt) <= rateWindow
+            current.recordedAt.timeIntervalSince($0.recordedAt) <= TrafficSamplingPolicy.rateSmoothingWindow
         }
     }
 
