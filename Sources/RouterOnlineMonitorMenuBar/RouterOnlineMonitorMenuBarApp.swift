@@ -813,28 +813,19 @@ struct MenuPopoverView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, minHeight: 150)
             } else {
-                TrafficChartView(samples: recentSamples)
-                .frame(maxWidth: .infinity)
-                .frame(height: 170)
-            }
-
-            if let latestSample = monitor.samples.last {
-                Divider()
-                let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
-                HStack(spacing: 12) {
-                    TrafficMetricView(
-                        title: L10n.string("traffic.download"),
-                        value: formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"),
-                        systemImage: "arrow.down",
-                        color: .blue
-                    )
-                    TrafficMetricView(
-                        title: L10n.string("traffic.upload"),
-                        value: formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"),
-                        systemImage: "arrow.up",
-                        color: Color(nsColor: .systemPink)
-                    )
+                HStack(alignment: .center, spacing: 12) {
+                    if let latestSample = monitor.samples.last {
+                        let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
+                        TrafficMetricView(
+                            downloadValue: formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"),
+                            uploadValue: formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit")
+                        )
+                        .frame(width: 112)
+                    }
+                    TrafficChartView(samples: recentSamples)
+                        .frame(maxWidth: .infinity)
                 }
+                .frame(height: 170)
             }
         }
         .padding(PopoverLayout.cardPadding)
@@ -1031,27 +1022,43 @@ struct MenuPopoverView: View {
 }
 
 private struct TrafficMetricView: View {
-    let title: String
-    let value: String
-    let systemImage: String
-    let color: Color
+    let downloadValue: String
+    let uploadValue: String
 
     var body: some View {
-        Label {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.headline.monospacedDigit())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-        } icon: {
-            Image(systemName: systemImage)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 0) {
+            metric(
+                title: L10n.string("traffic.download"),
+                value: downloadValue,
+                systemImage: "arrow.down",
+                color: .blue
+            )
+            .frame(maxHeight: .infinity, alignment: .center)
+
+            Divider()
+
+            metric(
+                title: L10n.string("traffic.upload"),
+                value: uploadValue,
+                systemImage: "arrow.up",
+                color: Color(nsColor: .systemPink)
+            )
+            .frame(maxHeight: .infinity, alignment: .center)
         }
-        .foregroundStyle(color)
+        .frame(maxHeight: .infinity)
+    }
+
+    private func metric(title: String, value: String, systemImage: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
