@@ -59,8 +59,8 @@
 "picker.menuBarDisplay" = "Display";
 "picker.menuBarDisplay.minimalist" = "Minimalist";
 "picker.menuBarDisplay.percentage" = "Percentage";
-"picker.menuBarDisplay.rate" = "Traffic rate";
-"picker.menuBarDisplay.rectangles" = "Rectangles (Default)";
+"picker.menuBarDisplay.rate" = "Traffic rate (Default)";
+"picker.menuBarDisplay.rectangles" = "Rectangles";
 "picker.menuBarDisplay.stableText" = "Stable text";
 "picker.menuBarLabels" = "Labels";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Default)";

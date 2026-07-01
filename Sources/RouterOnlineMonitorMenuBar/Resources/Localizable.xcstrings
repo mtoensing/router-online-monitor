@@ -982,13 +982,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verkehrsrate"
+            "value" : "Verkehrsrate (Standard)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Traffic rate"
+            "value" : "Traffic rate (Default)"
           }
         }
       }
@@ -998,13 +998,13 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rechtecke (Standard)"
+            "value" : "Rechtecke"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rectangles (Default)"
+            "value" : "Rectangles"
           }
         }
       }

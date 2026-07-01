@@ -17,6 +17,10 @@ final class MenuBarDisplayStyleTests: XCTestCase {
         XCTAssertEqual(MenuBarDisplayStyle.percentage.rawValue, "percentage")
     }
 
+    func testTrafficRateIsDefaultDisplayStyle() {
+        XCTAssertEqual(MenuBarDisplayStyle.defaultStyle, .rate)
+    }
+
     func testOnlyRateShowsDecimalPrecisionToggle() {
         let stylesWithDecimalPrecisionToggle = MenuBarDisplayStyle.allCases
             .filter(\.showsDecimalPrecisionToggle)

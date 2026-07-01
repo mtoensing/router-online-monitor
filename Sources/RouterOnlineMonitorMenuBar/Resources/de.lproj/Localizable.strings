@@ -59,8 +59,8 @@
 "picker.menuBarDisplay" = "Anzeige";
 "picker.menuBarDisplay.minimalist" = "Minimalistisch";
 "picker.menuBarDisplay.percentage" = "Prozent";
-"picker.menuBarDisplay.rate" = "Verkehrsrate";
-"picker.menuBarDisplay.rectangles" = "Rechtecke (Standard)";
+"picker.menuBarDisplay.rate" = "Verkehrsrate (Standard)";
+"picker.menuBarDisplay.rectangles" = "Rechtecke";
 "picker.menuBarDisplay.stableText" = "Stabiler Text";
 "picker.menuBarLabels" = "Beschriftungen";
 "picker.menuBarLabels.arrows" = "↓ / ↑ (Standard)";

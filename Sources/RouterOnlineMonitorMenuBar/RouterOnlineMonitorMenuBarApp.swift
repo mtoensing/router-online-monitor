@@ -34,6 +34,8 @@ enum MenuBarDisplayStyle: String, CaseIterable, Identifiable {
     case stableText
     case percentage
 
+    static let defaultStyle: Self = .rate
+
     var id: String { rawValue }
 
     var pickerLocalizationKey: String {
@@ -178,7 +180,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSPopoverDelegat
         let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
         let highlightNearCapacity = AppDefaults.highlightNearCapacityMenuBarItems
         let labels = menuBarLabels()
-        switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? "rectangles" {
+        switch UserDefaults.standard.string(forKey: "menuBarDisplayStyle") ?? MenuBarDisplayStyle.defaultStyle.rawValue {
         case "minimalist":
             setMenuBarIcon(
                 downloadAtCapacity: highlightNearCapacity && isAtCapacity(sample.downloadBitsPerSecond, capacity: downCapacity),
@@ -1291,7 +1293,7 @@ struct SettingsView: View {
     let onSaved: () -> Void
     @AppStorage("routerHost") private var host = "192.168.178.1"
     @AppStorage("routerUsername") private var username = ""
-    @AppStorage("menuBarDisplayStyle") private var menuBarDisplayStyle = "rectangles"
+    @AppStorage("menuBarDisplayStyle") private var menuBarDisplayStyle = MenuBarDisplayStyle.defaultStyle.rawValue
     @AppStorage("menuBarLabelStyle") private var menuBarLabelStyle = "arrows"
     @AppStorage("showOneDecimalMbit") private var showOneDecimalMbit = false
     @AppStorage("highlightNearCapacityMenuBarItems") private var highlightNearCapacityMenuBarItems = true
@@ -1621,7 +1623,7 @@ struct SettingsView: View {
     }
 
     private var selectedMenuBarDisplayStyle: MenuBarDisplayStyle {
-        MenuBarDisplayStyle(rawValue: menuBarDisplayStyle) ?? .rectangles
+        MenuBarDisplayStyle(rawValue: menuBarDisplayStyle) ?? .defaultStyle
     }
 
     private var menuBarDisplayHelp: String {
