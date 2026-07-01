@@ -83,7 +83,7 @@ enum RouterOnlineMonitorMenuBarApp {
 }
 
 @MainActor
-final class MenuBarController: NSObject, NSApplicationDelegate {
+final class MenuBarController: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var samplesSubscription: AnyCancellable?
@@ -109,6 +109,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             let monitor = TrafficMonitor.shared
             popover.behavior = .transient
+            popover.delegate = self
             item.button?.target = self
             item.button?.action = #selector(togglePopover)
             samplesSubscription = monitor.$samples.sink { [weak self] _ in self?.updateMenuBar() }
@@ -121,6 +122,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         TrafficMonitor.shared.persistSamples()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        popover.contentViewController = nil
+        currentPopoverContentSize = .zero
     }
 
     private func installMainMenu() {
