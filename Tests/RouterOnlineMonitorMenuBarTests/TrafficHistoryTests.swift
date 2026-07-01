@@ -33,6 +33,42 @@ final class TrafficHistoryTests: XCTestCase {
         XCTAssertTrue(recentSamples.isEmpty)
     }
 
+    func testSmoothedRatesReduceBurstyCounterSawtoothForChartDisplay() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let samples = [
+            sample(at: start, downloadBitsPerSecond: 108_000_000),
+            sample(at: start.addingTimeInterval(5), downloadBitsPerSecond: 108_000_000),
+            sample(at: start.addingTimeInterval(10), downloadBitsPerSecond: 59_000_000),
+            sample(at: start.addingTimeInterval(15), downloadBitsPerSecond: 108_000_000),
+        ]
+
+        let smoothed = TrafficSampleSeries.smoothedRates(in: samples, window: 15, maximumGap: 60)
+
+        XCTAssertEqual(smoothed.map { round($0.downloadBitsPerSecond / 1_000_000) }, [
+            108,
+            108,
+            92,
+            96,
+        ])
+    }
+
+    func testSmoothedRatesDoNotCrossSleepSizedGaps() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let samples = [
+            sample(at: start, downloadBitsPerSecond: 100_000_000),
+            sample(at: start.addingTimeInterval(5), downloadBitsPerSecond: 50_000_000),
+            sample(at: start.addingTimeInterval(65), downloadBitsPerSecond: 10_000_000),
+        ]
+
+        let smoothed = TrafficSampleSeries.smoothedRates(in: samples, window: 15, maximumGap: 60)
+
+        XCTAssertEqual(smoothed.map(\.downloadBitsPerSecond), [
+            100_000_000,
+            75_000_000,
+            10_000_000,
+        ])
+    }
+
     func testSampleStorageDropsExpiredSamplesAndCapsLoadedHistory() throws {
         let now = Date(timeIntervalSince1970: 10_000)
         let url = FileManager.default.temporaryDirectory
@@ -125,11 +161,108 @@ final class TrafficHistoryTests: XCTestCase {
         XCTAssertEqual(segments[1].control2, points[2])
     }
 
+    func testChartInterpolationSplitsRunsAtMinuteSizedGaps() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let points = [
+            chartPoint(at: start, point: CGPoint(x: 0, y: 4)),
+            chartPoint(at: start.addingTimeInterval(5), point: CGPoint(x: 5, y: 6)),
+            chartPoint(at: start.addingTimeInterval(65), point: CGPoint(x: 65, y: 3)),
+            chartPoint(at: start.addingTimeInterval(70), point: CGPoint(x: 70, y: 8)),
+        ]
+
+        let runs = TrafficChartInterpolation.contiguousRuns(in: points, maximumGap: 60)
+
+        XCTAssertEqual(runs.count, 2)
+        XCTAssertEqual(runs[0].map(\.point), [points[0].point, points[1].point])
+        XCTAssertEqual(runs[1].map(\.point), [points[2].point, points[3].point])
+    }
+
+    func testChartInterpolationKeepsSubMinuteGapsInSameRun() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let points = [
+            chartPoint(at: start, point: CGPoint(x: 0, y: 4)),
+            chartPoint(at: start.addingTimeInterval(59.9), point: CGPoint(x: 59.9, y: 6)),
+        ]
+
+        let runs = TrafficChartInterpolation.contiguousRuns(in: points, maximumGap: 60)
+
+        XCTAssertEqual(runs.count, 1)
+        XCTAssertEqual(runs[0].map(\.point), points.map(\.point))
+    }
+
+    func testChartInterpolationAddsMarkersAroundMinuteSizedGaps() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let points = [
+            chartPoint(at: start, point: CGPoint(x: 0, y: 4)),
+            chartPoint(at: start.addingTimeInterval(5), point: CGPoint(x: 5, y: 6)),
+            chartPoint(at: start.addingTimeInterval(65), point: CGPoint(x: 65, y: 3)),
+            chartPoint(at: start.addingTimeInterval(70), point: CGPoint(x: 70, y: 8)),
+        ]
+
+        let markerPoints = TrafficChartInterpolation.gapMarkerPoints(in: points, maximumGap: 60)
+
+        XCTAssertEqual(markerPoints, [points[1].point, points[2].point])
+    }
+
+    func testRateEstimatorUsesLongerWindowAfterWarmup() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let observations = [
+            counterObservation(at: start, receivedBytes: bytes(forMbit: 0, seconds: 0)),
+            counterObservation(at: start.addingTimeInterval(5), receivedBytes: bytes(forMbit: 108, seconds: 5)),
+            counterObservation(at: start.addingTimeInterval(10), receivedBytes: bytes(forMbit: 108 + 108, seconds: 5)),
+        ]
+        let current = counterObservation(
+            at: start.addingTimeInterval(15),
+            receivedBytes: bytes(forMbit: 108 + 108 + 59, seconds: 5)
+        )
+
+        let sample = TrafficRateEstimator.sample(from: observations, to: current)
+
+        XCTAssertEqual(sample?.downloadBitsPerSecond ?? 0, 91_666_666, accuracy: 1)
+    }
+
+    func testRateEstimatorSkipsSleepSizedGapsAndResetsObservationHistory() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let observations = [
+            counterObservation(at: start, receivedBytes: 0),
+            counterObservation(at: start.addingTimeInterval(5), receivedBytes: bytes(forMbit: 100, seconds: 5)),
+        ]
+        let current = counterObservation(
+            at: start.addingTimeInterval(65),
+            receivedBytes: bytes(forMbit: 100, seconds: 10)
+        )
+
+        XCTAssertNil(TrafficRateEstimator.sample(from: observations, to: current))
+        XCTAssertEqual(TrafficRateEstimator.observations(afterAdding: current, to: observations).map(\.recordedAt), [
+            current.recordedAt,
+        ])
+    }
+
     private func sample(at date: Date) -> TrafficSample {
+        sample(at: date, downloadBitsPerSecond: 2)
+    }
+
+    private func sample(at date: Date, downloadBitsPerSecond: Double) -> TrafficSample {
         TrafficSample(
             recordedAt: date,
             uploadBitsPerSecond: 1,
-            downloadBitsPerSecond: 2
+            downloadBitsPerSecond: downloadBitsPerSecond
         )
+    }
+
+    private func chartPoint(at date: Date, point: CGPoint) -> TrafficChartInterpolation.ChartPoint {
+        TrafficChartInterpolation.ChartPoint(recordedAt: date, point: point)
+    }
+
+    private func counterObservation(
+        at date: Date,
+        sentBytes: UInt64 = 0,
+        receivedBytes: UInt64
+    ) -> TrafficCounterObservation {
+        TrafficCounterObservation(recordedAt: date, sent: sentBytes, received: receivedBytes)
+    }
+
+    private func bytes(forMbit mbit: Double, seconds: Double) -> UInt64 {
+        UInt64(mbit * 1_000_000 * seconds / 8)
     }
 }

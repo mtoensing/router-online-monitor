@@ -1000,8 +1000,13 @@ struct MenuPopoverView: View {
 
     private var recentSamples: [TrafficSample] {
         let cutoff = Date().addingTimeInterval(-30 * 60)
-        return TrafficSampleSeries.recentSlice(from: monitor.samples, since: cutoff)
+        let cappedSamples = TrafficSampleSeries.recentSlice(from: monitor.samples, since: cutoff)
             .map(TrafficRateLimiter.cappedToConfiguredCapacities)
+        return TrafficSampleSeries.smoothedRates(
+            in: cappedSamples,
+            window: TrafficRateEstimator.rateWindow,
+            maximumGap: TrafficRateEstimator.maximumSampleGap
+        )
     }
 
     private func applyDefaultConfigPanelState() {
@@ -1052,6 +1057,8 @@ private struct TrafficMetricView: View {
 }
 
 private struct TrafficChartView: View {
+    private static let maximumInterpolatedSampleGap: TimeInterval = 60
+
     let samples: [TrafficSample]
 
     var body: some View {
@@ -1134,11 +1141,33 @@ private struct TrafficChartView: View {
         color: Color,
         style: StrokeStyle
     ) {
-        let points = samples.map { sample in
-            layout.point(for: sample, value: sample[keyPath: value])
+        let chartPoints = samples.map { sample in
+            TrafficChartInterpolation.ChartPoint(
+                recordedAt: sample.recordedAt,
+                point: layout.point(for: sample, value: sample[keyPath: value])
+            )
         }
-        let path = TrafficChartInterpolation.path(through: points)
-        context.stroke(path, with: .color(color), style: style)
+
+        for run in TrafficChartInterpolation.contiguousRuns(
+            in: chartPoints,
+            maximumGap: Self.maximumInterpolatedSampleGap
+        ) where run.count > 1 {
+            let path = TrafficChartInterpolation.path(through: run.map(\.point))
+            context.stroke(path, with: .color(color), style: style)
+        }
+
+        for point in TrafficChartInterpolation.gapMarkerPoints(
+            in: chartPoints,
+            maximumGap: Self.maximumInterpolatedSampleGap
+        ) {
+            let markerFrame = CGRect(
+                x: point.x - 2,
+                y: point.y - 2,
+                width: 4,
+                height: 4
+            )
+            context.fill(Path(ellipseIn: markerFrame), with: .color(color))
+        }
     }
 }
 
@@ -1214,11 +1243,43 @@ private struct TrafficChartLayout {
 }
 
 enum TrafficChartInterpolation {
+    struct ChartPoint {
+        let recordedAt: Date
+        let point: CGPoint
+    }
+
     struct CurveSegment {
         let start: CGPoint
         let control1: CGPoint
         let control2: CGPoint
         let end: CGPoint
+    }
+
+    static func contiguousRuns(in points: [ChartPoint], maximumGap: TimeInterval) -> [[ChartPoint]] {
+        guard let firstPoint = points.first else { return [] }
+
+        var runs: [[ChartPoint]] = [[firstPoint]]
+        for point in points.dropFirst() {
+            guard let previousPoint = runs[runs.count - 1].last else { continue }
+            if point.recordedAt.timeIntervalSince(previousPoint.recordedAt) >= maximumGap {
+                runs.append([point])
+            } else {
+                runs[runs.count - 1].append(point)
+            }
+        }
+        return runs
+    }
+
+    static func gapMarkerPoints(in points: [ChartPoint], maximumGap: TimeInterval) -> [CGPoint] {
+        guard points.count > 1 else { return points.map(\.point) }
+
+        var markerPoints: [CGPoint] = []
+        for (previousPoint, point) in zip(points, points.dropFirst()) {
+            guard point.recordedAt.timeIntervalSince(previousPoint.recordedAt) >= maximumGap else { continue }
+            markerPoints.append(previousPoint.point)
+            markerPoints.append(point.point)
+        }
+        return markerPoints
     }
 
     static func path(through points: [CGPoint]) -> Path {
@@ -1803,6 +1864,44 @@ enum TrafficSampleSeries {
         }
         return samples[firstRecentSampleIndex...]
     }
+
+    static func smoothedRates(
+        in samples: [TrafficSample],
+        window: TimeInterval,
+        maximumGap: TimeInterval
+    ) -> [TrafficSample] {
+        guard samples.count > 1, window > 0 else { return samples }
+
+        var smoothedSamples: [TrafficSample] = []
+        var runStartIndex = samples.startIndex
+
+        for index in samples.indices {
+            if index > samples.startIndex {
+                let previousIndex = samples.index(before: index)
+                if samples[index].recordedAt.timeIntervalSince(samples[previousIndex].recordedAt) >= maximumGap {
+                    runStartIndex = index
+                }
+            }
+
+            let cutoff = samples[index].recordedAt.addingTimeInterval(-window)
+            var windowStartIndex = runStartIndex
+            while windowStartIndex < index, samples[windowStartIndex].recordedAt < cutoff {
+                windowStartIndex = samples.index(after: windowStartIndex)
+            }
+
+            let windowSamples = samples[windowStartIndex...index]
+            let divisor = Double(windowSamples.count)
+            let upload = windowSamples.reduce(0) { $0 + $1.uploadBitsPerSecond } / divisor
+            let download = windowSamples.reduce(0) { $0 + $1.downloadBitsPerSecond } / divisor
+            smoothedSamples.append(TrafficSample(
+                recordedAt: samples[index].recordedAt,
+                uploadBitsPerSecond: upload,
+                downloadBitsPerSecond: download
+            ))
+        }
+
+        return smoothedSamples
+    }
 }
 
 enum TrafficRateLimiter {
@@ -1832,6 +1931,51 @@ struct DSLLineRates {
     let maximumUpstreamMbit: Double
 }
 
+struct TrafficCounterObservation {
+    let recordedAt: Date
+    let sent: UInt64
+    let received: UInt64
+}
+
+enum TrafficRateEstimator {
+    static let rateWindow: TimeInterval = 15
+    static let maximumSampleGap: TimeInterval = 60
+
+    static func sample(from observations: [TrafficCounterObservation], to current: TrafficCounterObservation) -> TrafficSample? {
+        guard let previous = observations.last else { return nil }
+        let previousElapsed = current.recordedAt.timeIntervalSince(previous.recordedAt)
+        guard previousElapsed > 0 else { return nil }
+        guard previousElapsed < maximumSampleGap else { return nil }
+
+        let baseline = observations.last(where: {
+            current.recordedAt.timeIntervalSince($0.recordedAt) >= rateWindow
+        }) ?? observations.first ?? previous
+        let elapsed = current.recordedAt.timeIntervalSince(baseline.recordedAt)
+        guard elapsed > 0 else { return nil }
+
+        return TrafficSample(
+            recordedAt: current.recordedAt,
+            uploadBitsPerSecond: Double(delta(from: baseline.sent, to: current.sent)) * 8 / elapsed,
+            downloadBitsPerSecond: Double(delta(from: baseline.received, to: current.received)) * 8 / elapsed
+        )
+    }
+
+    static func observations(afterAdding current: TrafficCounterObservation, to observations: [TrafficCounterObservation]) -> [TrafficCounterObservation] {
+        if let previous = observations.last,
+           current.recordedAt.timeIntervalSince(previous.recordedAt) >= maximumSampleGap {
+            return [current]
+        }
+
+        return (observations + [current]).filter {
+            current.recordedAt.timeIntervalSince($0.recordedAt) <= rateWindow
+        }
+    }
+
+    private static func delta(from old: UInt64, to new: UInt64) -> UInt64 {
+        new >= old ? new - old : new + (1 << 32) - old
+    }
+}
+
 @MainActor
 final class TrafficMonitor: ObservableObject {
     static let shared = TrafficMonitor()
@@ -1844,7 +1988,7 @@ final class TrafficMonitor: ObservableObject {
     @Published private(set) var lastUpdated: Date?
 
     private let storage = SampleStorage()
-    private var previous: (date: Date, sent: UInt64, received: UInt64)?
+    private var counterObservations: [TrafficCounterObservation] = []
     private var timer: Timer?
     private var pollInFlight = false
     private var consecutivePollFailures = 0
@@ -1868,7 +2012,7 @@ final class TrafficMonitor: ObservableObject {
     func reconfigure() {
         client?.invalidate()
         client = nil
-        previous = nil
+        counterObservations = []
         preferencesVersion += 1
         poll()
         prepopulateLineCapacities()
@@ -1927,24 +2071,17 @@ final class TrafficMonitor: ObservableObject {
             do {
                 let counters = try await client.counters()
                 let now = Date()
-                if let previous {
-                    let elapsed = now.timeIntervalSince(previous.date)
-                    if elapsed > 0 {
-                        let rawSample = TrafficSample(
-                            recordedAt: now,
-                            uploadBitsPerSecond: Double(Self.delta(from: previous.sent, to: counters.sent)) * 8 / elapsed,
-                            downloadBitsPerSecond: Double(Self.delta(from: previous.received, to: counters.received)) * 8 / elapsed
-                        )
-                        let sample = TrafficRateLimiter.cappedToConfiguredCapacities(rawSample)
-                        samples.append(sample)
-                        pruneSamples(now: now)
-                        hasUnsavedSamples = true
-                        saveSamplesIfNeeded(now: now)
-                    }
+                let observation = TrafficCounterObservation(recordedAt: now, sent: counters.sent, received: counters.received)
+                if let rawSample = TrafficRateEstimator.sample(from: counterObservations, to: observation) {
+                    let sample = TrafficRateLimiter.cappedToConfiguredCapacities(rawSample)
+                    samples.append(sample)
+                    pruneSamples(now: now)
+                    hasUnsavedSamples = true
+                    saveSamplesIfNeeded(now: now)
                 } else {
                     status = L10n.string("status.connectedWaitingForSecondSample")
                 }
-                previous = (now, counters.sent, counters.received)
+                counterObservations = TrafficRateEstimator.observations(afterAdding: observation, to: counterObservations)
                 consecutivePollFailures = 0
                 isConnected = true
                 isConnecting = false
@@ -1968,10 +2105,6 @@ final class TrafficMonitor: ObservableObject {
                 }
             }
         }
-    }
-
-    private static func delta(from old: UInt64, to new: UInt64) -> UInt64 {
-        new >= old ? new - old : new + (1 << 32) - old
     }
 
     private func pruneSamples(now: Date) {
