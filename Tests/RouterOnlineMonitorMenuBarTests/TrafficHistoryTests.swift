@@ -1,5 +1,6 @@
 import XCTest
 import CoreGraphics
+import SwiftUI
 @testable import RouterOnlineMonitorMenuBar
 
 final class TrafficHistoryTests: XCTestCase {
@@ -143,6 +144,22 @@ final class TrafficHistoryTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(segment.control2.y, minimumY)
             XCTAssertLessThanOrEqual(segment.control2.y, maximumY)
         }
+    }
+
+    func testChartInterpolationAreaPathExtendsToBaseline() {
+        let path = TrafficChartInterpolation.areaPath(
+            through: [
+                CGPoint(x: 0, y: 10),
+                CGPoint(x: 10, y: 4),
+                CGPoint(x: 20, y: 8),
+            ],
+            baselineY: 30
+        )
+
+        XCTAssertEqual(path.boundingRect.minX, 0, accuracy: 0.001)
+        XCTAssertEqual(path.boundingRect.maxX, 20, accuracy: 0.001)
+        XCTAssertEqual(path.boundingRect.minY, 4, accuracy: 0.001)
+        XCTAssertEqual(path.boundingRect.maxY, 30, accuracy: 0.001)
     }
 
     func testChartInterpolationFallsBackToStraightSegmentsForDuplicateXValues() {

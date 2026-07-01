@@ -1071,6 +1071,7 @@ private struct TrafficChartView: View {
                 layout: layout,
                 value: \.downloadBitsPerSecond,
                 color: .blue,
+                fillOpacity: 0.08,
                 style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
             )
             drawLine(
@@ -1078,6 +1079,7 @@ private struct TrafficChartView: View {
                 layout: layout,
                 value: \.uploadBitsPerSecond,
                 color: Color(nsColor: .systemPink),
+                fillOpacity: 0.07,
                 style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [5, 3])
             )
         }
@@ -1139,6 +1141,7 @@ private struct TrafficChartView: View {
         layout: TrafficChartLayout,
         value: KeyPath<TrafficSample, Double>,
         color: Color,
+        fillOpacity: Double,
         style: StrokeStyle
     ) {
         let chartPoints = samples.map { sample in
@@ -1152,7 +1155,14 @@ private struct TrafficChartView: View {
             in: chartPoints,
             maximumGap: Self.maximumInterpolatedSampleGap
         ) where run.count > 1 {
-            let path = TrafficChartInterpolation.path(through: run.map(\.point))
+            let points = run.map(\.point)
+            let fillPath = TrafficChartInterpolation.areaPath(
+                through: points,
+                baselineY: layout.plotFrame.maxY
+            )
+            context.fill(fillPath, with: .color(color.opacity(fillOpacity)))
+
+            let path = TrafficChartInterpolation.path(through: points)
             context.stroke(path, with: .color(color), style: style)
         }
 
@@ -1290,6 +1300,20 @@ enum TrafficChartInterpolation {
         for segment in curveSegments(through: points) {
             path.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
         }
+        return path
+    }
+
+    static func areaPath(through points: [CGPoint], baselineY: CGFloat) -> Path {
+        var path = Path()
+        guard let firstPoint = points.first, let lastPoint = points.last else { return path }
+
+        path.move(to: CGPoint(x: firstPoint.x, y: baselineY))
+        path.addLine(to: firstPoint)
+        for segment in curveSegments(through: points) {
+            path.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
+        }
+        path.addLine(to: CGPoint(x: lastPoint.x, y: baselineY))
+        path.closeSubpath()
         return path
     }
 
