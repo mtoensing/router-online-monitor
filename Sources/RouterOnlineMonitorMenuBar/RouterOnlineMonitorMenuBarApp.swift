@@ -1063,10 +1063,12 @@ private struct TrafficChartView: View {
         Canvas { context, size in
             let layout = TrafficChartLayout(size: size, samples: samples)
             drawGrid(in: &context, layout: layout)
+            drawCapacityLines(in: &context, layout: layout)
             drawAxisLabels(in: &context, layout: layout)
             drawTrafficSeries(
                 in: &context,
                 layout: layout,
+                direction: .download,
                 value: \.downloadBitsPerSecond,
                 color: .blue,
                 fillOpacity: 0.08,
@@ -1075,6 +1077,7 @@ private struct TrafficChartView: View {
             drawTrafficSeries(
                 in: &context,
                 layout: layout,
+                direction: .upload,
                 value: \.uploadBitsPerSecond,
                 color: Color(nsColor: .systemPink),
                 fillOpacity: 0.07,
@@ -1092,6 +1095,11 @@ private struct TrafficChartView: View {
         }
         context.stroke(horizontalGrid, with: .color(Color(nsColor: .gridColor)), lineWidth: 0.6)
 
+        var zeroAxis = Path()
+        zeroAxis.move(to: CGPoint(x: layout.plotFrame.minX, y: layout.zeroAxisY))
+        zeroAxis.addLine(to: CGPoint(x: layout.plotFrame.maxX, y: layout.zeroAxisY))
+        context.stroke(zeroAxis, with: .color(Color(nsColor: .separatorColor)), lineWidth: 0.8)
+
         var verticalGrid = Path()
         for tick in layout.xTicks {
             verticalGrid.move(to: CGPoint(x: tick.positionX, y: layout.plotFrame.minY))
@@ -1102,6 +1110,19 @@ private struct TrafficChartView: View {
             with: .color(Color(nsColor: .gridColor)),
             style: StrokeStyle(lineWidth: 0.6, dash: [4, 5])
         )
+    }
+
+    private func drawCapacityLines(in context: inout GraphicsContext, layout: TrafficChartLayout) {
+        for line in layout.capacityLines {
+            var path = Path()
+            path.move(to: CGPoint(x: layout.plotFrame.minX, y: line.positionY))
+            path.addLine(to: CGPoint(x: layout.plotFrame.maxX, y: line.positionY))
+            context.stroke(
+                path,
+                with: .color(line.direction.color.opacity(0.45)),
+                style: StrokeStyle(lineWidth: 1, dash: [3, 4])
+            )
+        }
     }
 
     private func drawAxisLabels(in context: inout GraphicsContext, layout: TrafficChartLayout) {
@@ -1115,7 +1136,7 @@ private struct TrafficChartView: View {
 
         for tick in layout.yTicks {
             context.draw(
-                Text(TrafficChartScale.format(tick.value))
+                Text(tick.label)
                     .font(.caption.monospacedDigit())
                     .foregroundColor(.secondary),
                 at: CGPoint(x: layout.plotFrame.maxX + 4, y: tick.positionY),
@@ -1137,6 +1158,7 @@ private struct TrafficChartView: View {
     private func drawTrafficSeries(
         in context: inout GraphicsContext,
         layout: TrafficChartLayout,
+        direction: TrafficDirection,
         value: KeyPath<TrafficSample, Double>,
         color: Color,
         fillOpacity: Double,
@@ -1145,7 +1167,7 @@ private struct TrafficChartView: View {
         let chartPoints = samples.map { sample in
             TrafficChartInterpolation.ChartPoint(
                 recordedAt: sample.recordedAt,
-                point: layout.point(for: sample, value: sample[keyPath: value])
+                point: layout.point(for: sample, direction: direction, value: sample[keyPath: value])
             )
         }
 
@@ -1156,7 +1178,7 @@ private struct TrafficChartView: View {
             let points = run.map(\.point)
             let fillPath = TrafficChartInterpolation.areaPath(
                 through: points,
-                baselineY: layout.plotFrame.maxY
+                baselineY: layout.zeroAxisY
             )
             context.fill(fillPath, with: .color(color.opacity(fillOpacity)))
 
@@ -1179,10 +1201,22 @@ private struct TrafficChartView: View {
     }
 }
 
+enum TrafficDirection {
+    case download
+    case upload
+
+    var color: Color {
+        switch self {
+        case .download: return .blue
+        case .upload: return Color(nsColor: .systemPink)
+        }
+    }
+}
+
 private struct TrafficChartLayout {
     struct AxisTick: Identifiable {
         let id: Int
-        let value: Double
+        let label: String
         let positionY: CGFloat
     }
 
@@ -1192,13 +1226,22 @@ private struct TrafficChartLayout {
         let positionX: CGFloat
     }
 
+    struct CapacityLine: Identifiable {
+        let id: Int
+        let direction: TrafficDirection
+        let positionY: CGFloat
+    }
+
     let plotFrame: CGRect
+    let zeroAxisY: CGFloat
     let yTicks: [AxisTick]
     let xTicks: [TimeTick]
+    let capacityLines: [CapacityLine]
 
     private let startDate: Date
     private let endDate: Date
-    private let maxMbit: Double
+    private let downloadScaleMbit: Double
+    private let uploadScaleMbit: Double
 
     init(size: CGSize, samples: [TrafficSample]) {
         let plotFrame = CGRect(
@@ -1209,19 +1252,32 @@ private struct TrafficChartLayout {
         )
         let startDate = samples.first?.recordedAt ?? Date()
         let endDate = samples.last?.recordedAt ?? startDate.addingTimeInterval(1)
-        let maxMbit = TrafficChartScale.upperBound(
+        let capacities = TrafficChartScale.configuredCapacitiesMbit()
+        let downloadScaleMbit = TrafficChartScale.upperBound(
             for: samples,
-            configuredCapacityMbit: TrafficChartScale.configuredCapacityUpperBoundMbit()
+            value: \.downloadBitsPerSecond,
+            configuredCapacityMbit: capacities.download
         )
+        let uploadScaleMbit = TrafficChartScale.upperBound(
+            for: samples,
+            value: \.uploadBitsPerSecond,
+            configuredCapacityMbit: capacities.upload
+        )
+        let zeroAxisY = plotFrame.midY
 
-        let yTicks = (0...3).map { index in
-            let value = maxMbit / 3 * Double(index)
-            return AxisTick(
-                id: index,
-                value: value,
-                positionY: plotFrame.maxY - plotFrame.height * CGFloat(value / maxMbit)
-            )
-        }
+        let yTicks = Self.yTicks(
+            plotFrame: plotFrame,
+            zeroAxisY: zeroAxisY,
+            downloadScaleMbit: downloadScaleMbit,
+            uploadScaleMbit: uploadScaleMbit
+        )
+        let capacityLines = Self.capacityLines(
+            plotFrame: plotFrame,
+            zeroAxisY: zeroAxisY,
+            downloadScaleMbit: downloadScaleMbit,
+            uploadScaleMbit: uploadScaleMbit,
+            capacities: capacities
+        )
 
         let duration = max(1, endDate.timeIntervalSince(startDate))
         let xTicks = (1...5).map { index in
@@ -1235,21 +1291,108 @@ private struct TrafficChartLayout {
         }
 
         self.plotFrame = plotFrame
+        self.zeroAxisY = zeroAxisY
         self.startDate = startDate
         self.endDate = endDate
-        self.maxMbit = maxMbit
+        self.downloadScaleMbit = downloadScaleMbit
+        self.uploadScaleMbit = uploadScaleMbit
         self.yTicks = yTicks
         self.xTicks = xTicks
+        self.capacityLines = capacityLines
     }
 
-    func point(for sample: TrafficSample, value bitsPerSecond: Double) -> CGPoint {
+    func point(for sample: TrafficSample, direction: TrafficDirection, value bitsPerSecond: Double) -> CGPoint {
         let duration = max(1, endDate.timeIntervalSince(startDate))
         let timeFraction = sample.recordedAt.timeIntervalSince(startDate) / duration
-        let mbit = max(0, min(bitsPerSecond / 1_000_000, maxMbit))
+        let scaleMbit = scale(for: direction)
+        let mbit = max(0, min(bitsPerSecond / 1_000_000, scaleMbit))
         return CGPoint(
             x: plotFrame.minX + plotFrame.width * CGFloat(timeFraction),
-            y: plotFrame.maxY - plotFrame.height * CGFloat(mbit / maxMbit)
+            y: positionY(for: mbit, direction: direction)
         )
+    }
+
+    private func positionY(for valueMbit: Double, direction: TrafficDirection) -> CGFloat {
+        let fraction = CGFloat(valueMbit / scale(for: direction))
+        switch direction {
+        case .download:
+            return zeroAxisY - upperPlotHeight * fraction
+        case .upload:
+            return zeroAxisY + lowerPlotHeight * fraction
+        }
+    }
+
+    private func scale(for direction: TrafficDirection) -> Double {
+        switch direction {
+        case .download: return downloadScaleMbit
+        case .upload: return uploadScaleMbit
+        }
+    }
+
+    private var upperPlotHeight: CGFloat {
+        max(1, zeroAxisY - plotFrame.minY)
+    }
+
+    private var lowerPlotHeight: CGFloat {
+        max(1, plotFrame.maxY - zeroAxisY)
+    }
+
+    private static func yTicks(
+        plotFrame: CGRect,
+        zeroAxisY: CGFloat,
+        downloadScaleMbit: Double,
+        uploadScaleMbit: Double
+    ) -> [AxisTick] {
+        let upperPlotHeight = max(1, zeroAxisY - plotFrame.minY)
+        let lowerPlotHeight = max(1, plotFrame.maxY - zeroAxisY)
+        let downloadValues = [downloadScaleMbit, downloadScaleMbit / 2]
+        let uploadValues = [uploadScaleMbit / 2, uploadScaleMbit]
+
+        var ticks = downloadValues.enumerated().map { index, value in
+            AxisTick(
+                id: index,
+                label: TrafficChartScale.format(value),
+                positionY: zeroAxisY - upperPlotHeight * CGFloat(value / downloadScaleMbit)
+            )
+        }
+        ticks.append(AxisTick(id: 2, label: "0", positionY: zeroAxisY))
+        ticks += uploadValues.enumerated().map { index, value in
+            AxisTick(
+                id: index + 3,
+                label: TrafficChartScale.format(value),
+                positionY: zeroAxisY + lowerPlotHeight * CGFloat(value / uploadScaleMbit)
+            )
+        }
+        return ticks
+    }
+
+    private static func capacityLines(
+        plotFrame: CGRect,
+        zeroAxisY: CGFloat,
+        downloadScaleMbit: Double,
+        uploadScaleMbit: Double,
+        capacities: (download: Double?, upload: Double?)
+    ) -> [CapacityLine] {
+        let upperPlotHeight = max(1, zeroAxisY - plotFrame.minY)
+        let lowerPlotHeight = max(1, plotFrame.maxY - zeroAxisY)
+        var lines: [CapacityLine] = []
+
+        if let download = capacities.download, download > 0 {
+            lines.append(CapacityLine(
+                id: lines.count,
+                direction: .download,
+                positionY: zeroAxisY - upperPlotHeight * CGFloat(min(download / downloadScaleMbit, 1))
+            ))
+        }
+        if let upload = capacities.upload, upload > 0 {
+            lines.append(CapacityLine(
+                id: lines.count,
+                direction: .upload,
+                positionY: zeroAxisY + lowerPlotHeight * CGFloat(min(upload / uploadScaleMbit, 1))
+            ))
+        }
+
+        return lines
     }
 }
 
@@ -1432,6 +1575,23 @@ private extension CGPoint {
 }
 
 enum TrafficChartScale {
+    static func upperBound(
+        for samples: [TrafficSample],
+        value: KeyPath<TrafficSample, Double>,
+        configuredCapacityMbit: Double? = nil
+    ) -> Double {
+        if let configuredCapacityMbit,
+           configuredCapacityMbit.isFinite,
+           configuredCapacityMbit > 0 {
+            return configuredCapacityMbit * 1.2
+        }
+
+        let maximumMbit = samples.reduce(0) { maximum, sample in
+            max(maximum, sample[keyPath: value] / 1_000_000)
+        }
+        return niceUpperBound(maximumMbit)
+    }
+
     static func upperBound(for samples: [TrafficSample], configuredCapacityMbit: Double? = nil) -> Double {
         if let configuredCapacityMbit,
            configuredCapacityMbit.isFinite,
@@ -1449,13 +1609,22 @@ enum TrafficChartScale {
         return niceUpperBound(maximumMbit)
     }
 
-    static func configuredCapacityUpperBoundMbit(defaults: UserDefaults = .standard) -> Double? {
-        let capacities = [
-            defaults.double(forKey: "downstreamCapacityMbit"),
-            defaults.double(forKey: "upstreamCapacityMbit"),
-        ].filter { $0.isFinite && $0 > 0 }
+    static func configuredCapacitiesMbit(defaults: UserDefaults = .standard) -> (download: Double?, upload: Double?) {
+        (
+            download: configuredCapacityMbit(forKey: "downstreamCapacityMbit", defaults: defaults),
+            upload: configuredCapacityMbit(forKey: "upstreamCapacityMbit", defaults: defaults)
+        )
+    }
 
-        return capacities.max()
+    static func configuredCapacityUpperBoundMbit(defaults: UserDefaults = .standard) -> Double? {
+        let capacities = configuredCapacitiesMbit(defaults: defaults)
+        return [capacities.download, capacities.upload].compactMap { $0 }.max()
+    }
+
+    private static func configuredCapacityMbit(forKey key: String, defaults: UserDefaults) -> Double? {
+        let value = defaults.double(forKey: key)
+        guard value.isFinite, value > 0 else { return nil }
+        return value
     }
 
     static func niceUpperBound(_ value: Double) -> Double {

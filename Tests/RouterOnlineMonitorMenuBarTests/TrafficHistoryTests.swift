@@ -140,7 +140,27 @@ final class TrafficHistoryTests: XCTestCase {
         )
     }
 
-    func testChartScaleReadsLargestConfiguredCapacity() {
+    func testChartScaleUsesDirectionSpecificCapacityWhenConfigured() {
+        let samples = [
+            TrafficSample(
+                recordedAt: Date(timeIntervalSince1970: 1),
+                uploadBitsPerSecond: 80_000_000,
+                downloadBitsPerSecond: 230_000_000
+            ),
+        ]
+
+        XCTAssertEqual(
+            TrafficChartScale.upperBound(
+                for: samples,
+                value: \.uploadBitsPerSecond,
+                configuredCapacityMbit: 40
+            ),
+            48,
+            accuracy: 0.001
+        )
+    }
+
+    func testChartScaleReadsConfiguredCapacities() {
         let suiteName = UUID().uuidString
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -148,11 +168,11 @@ final class TrafficHistoryTests: XCTestCase {
         defaults.set(108.187, forKey: "downstreamCapacityMbit")
         defaults.set(20.5, forKey: "upstreamCapacityMbit")
 
-        XCTAssertEqual(
-            TrafficChartScale.configuredCapacityUpperBoundMbit(defaults: defaults) ?? 0,
-            108.187,
-            accuracy: 0.001
-        )
+        let capacities = TrafficChartScale.configuredCapacitiesMbit(defaults: defaults)
+
+        XCTAssertEqual(capacities.download ?? 0, 108.187, accuracy: 0.001)
+        XCTAssertEqual(capacities.upload ?? 0, 20.5, accuracy: 0.001)
+        XCTAssertEqual(TrafficChartScale.configuredCapacityUpperBoundMbit(defaults: defaults) ?? 0, 108.187, accuracy: 0.001)
     }
 
     func testChartInterpolationCreatesCurveSegmentsBetweenSamples() {
