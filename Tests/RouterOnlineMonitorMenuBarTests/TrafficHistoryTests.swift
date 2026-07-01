@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 @testable import RouterOnlineMonitorMenuBar
 
 final class TrafficHistoryTests: XCTestCase {
@@ -76,6 +77,52 @@ final class TrafficHistoryTests: XCTestCase {
         ]
 
         XCTAssertEqual(TrafficChartScale.upperBound(for: samples), 60)
+    }
+
+    func testChartInterpolationCreatesCurveSegmentsBetweenSamples() {
+        let points = [
+            CGPoint(x: 0, y: 10),
+            CGPoint(x: 10, y: 4),
+            CGPoint(x: 20, y: 8),
+        ]
+
+        let segments = TrafficChartInterpolation.curveSegments(through: points)
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].start, points[0])
+        XCTAssertEqual(segments[0].end, points[1])
+        XCTAssertEqual(segments[1].start, points[1])
+        XCTAssertEqual(segments[1].end, points[2])
+
+        for segment in segments {
+            XCTAssertGreaterThanOrEqual(segment.control1.x, segment.start.x)
+            XCTAssertLessThanOrEqual(segment.control1.x, segment.end.x)
+            XCTAssertGreaterThanOrEqual(segment.control2.x, segment.start.x)
+            XCTAssertLessThanOrEqual(segment.control2.x, segment.end.x)
+
+            let minimumY = min(segment.start.y, segment.end.y)
+            let maximumY = max(segment.start.y, segment.end.y)
+            XCTAssertGreaterThanOrEqual(segment.control1.y, minimumY)
+            XCTAssertLessThanOrEqual(segment.control1.y, maximumY)
+            XCTAssertGreaterThanOrEqual(segment.control2.y, minimumY)
+            XCTAssertLessThanOrEqual(segment.control2.y, maximumY)
+        }
+    }
+
+    func testChartInterpolationFallsBackToStraightSegmentsForDuplicateXValues() {
+        let points = [
+            CGPoint(x: 0, y: 10),
+            CGPoint(x: 0, y: 4),
+            CGPoint(x: 10, y: 8),
+        ]
+
+        let segments = TrafficChartInterpolation.curveSegments(through: points)
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].control1, points[0])
+        XCTAssertEqual(segments[0].control2, points[1])
+        XCTAssertEqual(segments[1].control1, points[1])
+        XCTAssertEqual(segments[1].control2, points[2])
     }
 
     private func sample(at date: Date) -> TrafficSample {

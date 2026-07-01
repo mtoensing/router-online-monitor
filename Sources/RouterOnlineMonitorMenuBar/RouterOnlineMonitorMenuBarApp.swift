@@ -1134,12 +1134,10 @@ private struct TrafficChartView: View {
         color: Color,
         style: StrokeStyle
     ) {
-        guard let firstSample = samples.first else { return }
-        var path = Path()
-        path.move(to: layout.point(for: firstSample, value: firstSample[keyPath: value]))
-        for sample in samples.dropFirst() {
-            path.addLine(to: layout.point(for: sample, value: sample[keyPath: value]))
+        let points = samples.map { sample in
+            layout.point(for: sample, value: sample[keyPath: value])
         }
+        let path = TrafficChartInterpolation.path(through: points)
         context.stroke(path, with: .color(color), style: style)
     }
 }
@@ -1212,6 +1210,138 @@ private struct TrafficChartLayout {
             x: plotFrame.minX + plotFrame.width * CGFloat(timeFraction),
             y: plotFrame.maxY - plotFrame.height * CGFloat(mbit / maxMbit)
         )
+    }
+}
+
+enum TrafficChartInterpolation {
+    struct CurveSegment {
+        let start: CGPoint
+        let control1: CGPoint
+        let control2: CGPoint
+        let end: CGPoint
+    }
+
+    static func path(through points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let firstPoint = points.first else { return path }
+
+        path.move(to: firstPoint)
+        for segment in curveSegments(through: points) {
+            path.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
+        }
+        return path
+    }
+
+    static func curveSegments(through points: [CGPoint]) -> [CurveSegment] {
+        guard points.count > 1 else { return [] }
+        guard points.allSatisfy(\.hasFiniteCoordinates), points.haveStrictlyIncreasingXValues else {
+            return straightSegments(through: points)
+        }
+
+        let intervals = zip(points, points.dropFirst()).map { nextPoint, point in
+            point.x - nextPoint.x
+        }
+        let slopes = zip(zip(points, points.dropFirst()), intervals).map { pointPair, interval in
+            let (point, nextPoint) = pointPair
+            return (nextPoint.y - point.y) / interval
+        }
+        let tangents = monotoneTangents(intervals: intervals, slopes: slopes)
+
+        return points.indices.dropLast().map { index in
+            let nextIndex = points.index(after: index)
+            let interval = intervals[index]
+            return CurveSegment(
+                start: points[index],
+                control1: CGPoint(
+                    x: points[index].x + interval / 3,
+                    y: points[index].y + tangents[index] * interval / 3
+                ),
+                control2: CGPoint(
+                    x: points[nextIndex].x - interval / 3,
+                    y: points[nextIndex].y - tangents[nextIndex] * interval / 3
+                ),
+                end: points[nextIndex]
+            )
+        }
+    }
+
+    private static func monotoneTangents(intervals: [CGFloat], slopes: [CGFloat]) -> [CGFloat] {
+        guard let firstSlope = slopes.first else { return [] }
+        guard slopes.count > 1 else { return [firstSlope, firstSlope] }
+
+        var tangents = Array(repeating: CGFloat.zero, count: slopes.count + 1)
+        tangents[0] = endpointTangent(
+            firstInterval: intervals[0],
+            secondInterval: intervals[1],
+            firstSlope: slopes[0],
+            secondSlope: slopes[1]
+        )
+
+        for index in 1..<slopes.count {
+            let previousSlope = slopes[index - 1]
+            let nextSlope = slopes[index]
+            guard previousSlope != 0, nextSlope != 0, previousSlope.sign == nextSlope.sign else {
+                tangents[index] = 0
+                continue
+            }
+
+            let previousInterval = intervals[index - 1]
+            let nextInterval = intervals[index]
+            let previousWeight = 2 * nextInterval + previousInterval
+            let nextWeight = nextInterval + 2 * previousInterval
+            tangents[index] = (previousWeight + nextWeight) / (previousWeight / previousSlope + nextWeight / nextSlope)
+        }
+
+        let lastIndex = slopes.count - 1
+        tangents[slopes.count] = endpointTangent(
+            firstInterval: intervals[lastIndex],
+            secondInterval: intervals[lastIndex - 1],
+            firstSlope: slopes[lastIndex],
+            secondSlope: slopes[lastIndex - 1]
+        )
+        return tangents
+    }
+
+    private static func endpointTangent(
+        firstInterval: CGFloat,
+        secondInterval: CGFloat,
+        firstSlope: CGFloat,
+        secondSlope: CGFloat
+    ) -> CGFloat {
+        let tangent = ((2 * firstInterval + secondInterval) * firstSlope - firstInterval * secondSlope) / (firstInterval + secondInterval)
+        if tangent == 0 || tangent.sign != firstSlope.sign {
+            return 0
+        }
+        if firstSlope.sign != secondSlope.sign, abs(tangent) > abs(3 * firstSlope) {
+            return 3 * firstSlope
+        }
+        return tangent
+    }
+
+    private static func straightSegments(through points: [CGPoint]) -> [CurveSegment] {
+        points.indices.dropLast().map { index in
+            let nextIndex = points.index(after: index)
+            return CurveSegment(
+                start: points[index],
+                control1: points[index],
+                control2: points[nextIndex],
+                end: points[nextIndex]
+            )
+        }
+    }
+}
+
+private extension Array where Element == CGPoint {
+    var haveStrictlyIncreasingXValues: Bool {
+        zip(self, dropFirst()).allSatisfy { point, nextPoint in
+            nextPoint.x > point.x
+        }
+    }
+}
+
+private extension CGPoint {
+    var hasFiniteCoordinates: Bool {
+        x.isFinite && y.isFinite
     }
 }
 
