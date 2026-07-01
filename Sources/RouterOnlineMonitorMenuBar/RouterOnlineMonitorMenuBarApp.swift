@@ -1011,7 +1011,7 @@ struct MenuPopoverView: View {
 
     private func applyDefaultConfigPanelState() {
         guard !configPanelUserPreferenceSet else { return }
-        isConfigPanelExpanded = !RouterClient.hasPreferences || !monitor.isConnected
+        isConfigPanelExpanded = isSetupRequired || !monitor.isConnected
     }
 
     private func registerVersionClick() {
@@ -1806,14 +1806,15 @@ struct SettingsView: View {
                     }
                     Spacer()
                     Button(L10n.string("button.saveAndConnect")) {
-                        Keychain.save(password: password)
-                        saved = true
-                        monitor.reconfigure()
-                        detectLineRates()
-                        if RouterClient.hasPreferences {
+                        guard let configuration = routerConfiguration else { return }
+                        if Keychain.save(password: configuration.password) {
+                            saved = true
+                            monitor.reconfigure(configuration: configuration)
+                            detectLineRates(using: configuration)
                             onSaved()
                         }
                     }
+                    .disabled(routerConfiguration == nil)
                     .keyboardShortcut(.defaultAction)
                 }
             }
@@ -1982,8 +1983,17 @@ struct SettingsView: View {
             .padding(.vertical, 5)
     }
 
+    private var routerConfiguration: RouterClient.Configuration? {
+        RouterClient.Configuration.validated(host: host, username: username, password: password)
+    }
+
     private func detectLineRates() {
-        guard let client = RouterClient.fromPreferences() else { return }
+        guard let configuration = routerConfiguration else { return }
+        detectLineRates(using: configuration)
+    }
+
+    private func detectLineRates(using configuration: RouterClient.Configuration) {
+        let client = RouterClient(configuration: configuration)
         Task {
             do {
                 let rates = try await client.lineRates()
@@ -2204,12 +2214,14 @@ final class TrafficMonitor: ObservableObject {
     private var pollInFlight = false
     private var consecutivePollFailures = 0
     private var client: RouterClient?
+    private var configuration: RouterClient.Configuration?
     private var lastStorageSaveAt: Date?
     private var hasUnsavedSamples = false
 
     init() {
         samples = storage.load()
         lastUpdated = samples.last?.recordedAt
+        configuration = RouterClient.Configuration.fromPreferences()
         scheduleTimer()
         poll()
         prepopulateLineCapacities()
@@ -2220,9 +2232,10 @@ final class TrafficMonitor: ObservableObject {
         client?.invalidate()
     }
 
-    func reconfigure() {
+    func reconfigure(configuration: RouterClient.Configuration? = nil) {
         client?.invalidate()
         client = nil
+        self.configuration = configuration ?? RouterClient.Configuration.fromPreferences()
         counterObservations = []
         preferencesVersion += 1
         poll()
@@ -2345,7 +2358,7 @@ final class TrafficMonitor: ObservableObject {
     }
 
     private func configuredClient() -> RouterClient? {
-        guard let configuration = RouterClient.Configuration.fromPreferences() else {
+        guard let configuration else {
             client?.invalidate()
             client = nil
             return nil
@@ -2371,11 +2384,24 @@ final class RouterClient {
         let username: String
         let password: String
 
+        init(host: String, username: String, password: String) {
+            self.host = host
+            self.username = username
+            self.password = password
+        }
+
+        static func validated(host: String, username: String, password: String) -> Configuration? {
+            let host = host.trimmingCharacters(in: .whitespacesAndNewlines)
+            let username = username.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !host.isEmpty, !username.isEmpty, !password.isEmpty else { return nil }
+            return Configuration(host: host, username: username, password: password)
+        }
+
         static func fromPreferences() -> Configuration? {
             let host = UserDefaults.standard.string(forKey: "routerHost")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let username = UserDefaults.standard.string(forKey: "routerUsername")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !host.isEmpty, !username.isEmpty, let password = Keychain.password(), !password.isEmpty else { return nil }
-            return Configuration(host: host, username: username, password: password)
+            guard let password = Keychain.password() else { return nil }
+            return validated(host: host, username: username, password: password)
         }
     }
 
@@ -2388,15 +2414,6 @@ final class RouterClient {
     private static let dslControlPath = "/upnp/control/wandslifconfig1"
 
     private var host: String { configuration.host }
-
-    static func fromPreferences() -> RouterClient? {
-        guard let configuration = Configuration.fromPreferences() else { return nil }
-        return RouterClient(configuration: configuration)
-    }
-
-    static var hasPreferences: Bool {
-        Configuration.fromPreferences() != nil
-    }
 
     init(configuration: Configuration) {
         self.configuration = configuration
@@ -2616,21 +2633,45 @@ final class SampleStorage {
 enum Keychain {
     private static let service = "RouterOnlineMonitor"
     private static let account = "router-password"
+    private static var cachedPassword: String?
+    private static var hasCachedPassword = false
 
     static func password() -> String? {
+        if hasCachedPassword {
+            return cachedPassword
+        }
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecReturnData as String: true]
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else {
+            cachedPassword = nil
+            hasCachedPassword = true
+            return nil
+        }
+        cachedPassword = String(data: data, encoding: .utf8)
+        hasCachedPassword = true
+        return cachedPassword
     }
 
-    static func save(password: String) {
+    @discardableResult
+    static func save(password: String) -> Bool {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
         let attributes = [kSecValueData as String: Data(password.utf8)]
-        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecSuccess {
+            cachedPassword = password
+            hasCachedPassword = true
+            return true
+        }
+        if status == errSecItemNotFound {
             var item = query
             item[kSecValueData as String] = Data(password.utf8)
-            SecItemAdd(item as CFDictionary, nil)
+            let addStatus = SecItemAdd(item as CFDictionary, nil)
+            if addStatus == errSecSuccess {
+                cachedPassword = password
+                hasCachedPassword = true
+                return true
+            }
         }
+        return false
     }
 }

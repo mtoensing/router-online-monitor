@@ -20,6 +20,7 @@ for localized_resources in Resources/*.lproj; do
     cp -R "$localized_resources" "$app/Contents/Resources/"
 done
 clean_extended_attributes() {
+    xattr -cr "$app" 2>/dev/null || true
     find "$app" -exec xattr -c {} \; 2>/dev/null || true
     find "$app" -exec xattr -d com.apple.ResourceFork {} \; 2>/dev/null || true
     find "$app" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
