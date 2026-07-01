@@ -69,6 +69,12 @@ enum AppDefaults {
     }
 }
 
+enum CapacityWarning {
+    static func isNearCapacity(_ bitsPerSecond: Double, capacityBitsPerSecond: Double) -> Bool {
+        capacityBitsPerSecond > 0 && bitsPerSecond >= capacityBitsPerSecond * 0.95
+    }
+}
+
 @main
 enum RouterOnlineMonitorMenuBarApp {
     @MainActor private static var menuBarController: MenuBarController?
@@ -573,7 +579,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSPopoverDelegat
     }
 
     private func isNearCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
-        capacity > 0 && bitsPerSecond >= capacity * 0.95
+        CapacityWarning.isNearCapacity(bitsPerSecond, capacityBitsPerSecond: capacity)
     }
 
     private func isAtCapacity(_ bitsPerSecond: Double, capacity: Double) -> Bool {
@@ -816,9 +822,14 @@ struct MenuPopoverView: View {
                 HStack(alignment: .center, spacing: 12) {
                     if let latestSample = monitor.samples.last {
                         let latest = TrafficRateLimiter.cappedToConfiguredCapacities(latestSample)
+                        let downCapacity = UserDefaults.standard.double(forKey: "downstreamCapacityMbit") * 1_000_000
+                        let upCapacity = UserDefaults.standard.double(forKey: "upstreamCapacityMbit") * 1_000_000
+                        let highlightNearCapacity = AppDefaults.highlightNearCapacityMenuBarItems
                         TrafficMetricView(
                             downloadValue: formatWithPercentage(latest.downloadBitsPerSecond, capacityKey: "downstreamCapacityMbit"),
-                            uploadValue: formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit")
+                            uploadValue: formatWithPercentage(latest.uploadBitsPerSecond, capacityKey: "upstreamCapacityMbit"),
+                            downloadNearCapacity: highlightNearCapacity && CapacityWarning.isNearCapacity(latest.downloadBitsPerSecond, capacityBitsPerSecond: downCapacity),
+                            uploadNearCapacity: highlightNearCapacity && CapacityWarning.isNearCapacity(latest.uploadBitsPerSecond, capacityBitsPerSecond: upCapacity)
                         )
                         .frame(width: 112)
                     }
@@ -1024,6 +1035,8 @@ struct MenuPopoverView: View {
 private struct TrafficMetricView: View {
     let downloadValue: String
     let uploadValue: String
+    let downloadNearCapacity: Bool
+    let uploadNearCapacity: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1031,7 +1044,8 @@ private struct TrafficMetricView: View {
                 title: L10n.string("traffic.download"),
                 value: downloadValue,
                 systemImage: "arrow.down",
-                color: .blue
+                color: .blue,
+                isNearCapacity: downloadNearCapacity
             )
             .frame(maxHeight: .infinity, alignment: .center)
 
@@ -1041,21 +1055,23 @@ private struct TrafficMetricView: View {
                 title: L10n.string("traffic.upload"),
                 value: uploadValue,
                 systemImage: "arrow.up",
-                color: Color(nsColor: .systemPink)
+                color: Color(nsColor: .systemPink),
+                isNearCapacity: uploadNearCapacity
             )
             .frame(maxHeight: .infinity, alignment: .center)
         }
         .frame(maxHeight: .infinity)
     }
 
-    private func metric(title: String, value: String, systemImage: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func metric(title: String, value: String, systemImage: String, color: Color, isNearCapacity: Bool) -> some View {
+        let warningColor = Color(nsColor: .systemRed)
+        return VStack(alignment: .leading, spacing: 4) {
             Label(title, systemImage: systemImage)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(color)
+                .foregroundStyle(isNearCapacity ? warningColor : color)
             Text(value)
                 .font(.headline.monospacedDigit())
-                .foregroundStyle(.primary)
+                .foregroundStyle(isNearCapacity ? warningColor : Color.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
