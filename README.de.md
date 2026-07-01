@@ -6,7 +6,7 @@
   <img src="docs/images/router-online-monitor-logo.svg" alt="Router Online Monitor App-Icon: weiße Pfeile für Download und Upload auf rotem Hintergrund" width="180">
 </p>
 
-Eine native macOS-Menüleisten-App zum Überwachen des Internetverkehrs am Router. Sie verbindet sich direkt über die TR-064-API mit kompatiblen FRITZ!Box-Routern, erfasst den gesamten WAN-Download- und Upload-Traffic, zeigt ein Diagramm für den gespeicherten Verlauf und legt Zugangsdaten im macOS-Schlüsselbund ab.
+Eine besonders schlanke native macOS-Menüleisten-App zum Überwachen des Internetverkehrs am Router. Sie verbindet sich direkt über die TR-064-API mit kompatiblen FRITZ!Box-Routern, erfasst den gesamten WAN-Download- und Upload-Traffic, zeigt ein Diagramm für den gespeicherten Verlauf und legt Zugangsdaten im macOS-Schlüsselbund ab.
 
 ## Screenshots
 
